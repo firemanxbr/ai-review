@@ -1,0 +1,32 @@
+{
+  "name": "ai-review",
+  "version": "0.1.0",
+  "description": "Privacy-first, local AI code review platform for macOS",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firemanxbr/ai-review.git"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.2"
+  }
+}

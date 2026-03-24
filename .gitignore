@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Rust target
+src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env files
+.env
+.env.local
+
+# Tauri generated
+src-tauri/gen/
