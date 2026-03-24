@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke, listen } from "./tauri";
+import { startPolling, stopPolling } from "./browser-poller";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Repos from "./pages/Repos";
@@ -90,6 +91,47 @@ function App() {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // Browser-mode polling loop
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  const pollerActive = useRef(false);
+
+  useEffect(() => {
+    if (isTauri || !config) return;
+
+    const shouldPoll =
+      config.is_polling_active &&
+      config.github_pat &&
+      config.watched_repos.length > 0 &&
+      config.selected_model;
+
+    if (shouldPoll && !pollerActive.current) {
+      pollerActive.current = true;
+      startPolling(
+        config.github_pat,
+        config.watched_repos,
+        config.selected_model,
+        config.poll_interval_secs,
+        (event) => {
+          const item: ActivityItem = {
+            ...event,
+            timestamp: new Date().toISOString(),
+          };
+          setLiveActivity((prev) => [item, ...prev].slice(0, 100));
+        }
+      );
+    } else if (!shouldPoll && pollerActive.current) {
+      pollerActive.current = false;
+      stopPolling();
+    }
+
+    return () => {
+      if (pollerActive.current) {
+        pollerActive.current = false;
+        stopPolling();
+      }
+    };
+  }, [config, isTauri]);
 
   const renderPage = () => {
     switch (page) {
