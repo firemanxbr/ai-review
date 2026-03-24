@@ -67,14 +67,25 @@ function App() {
     }
   }, []);
 
+  const checkLmStudioDirect = useCallback(async (): Promise<boolean> => {
+    try {
+      const resp = await fetch("/lmstudio/v1/models");
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const refreshStatus = useCallback(async () => {
     try {
       const s = await invoke<Status>("get_status");
       setStatus(s);
-    } catch (e) {
-      console.error("Failed to load status:", e);
+    } catch {
+      // Tauri IPC not available (running in browser) — check LM Studio directly
+      const lmOnline = await checkLmStudioDirect();
+      setStatus((prev) => ({ ...prev, lm_studio_online: lmOnline }));
     }
-  }, []);
+  }, [checkLmStudioDirect]);
 
   useEffect(() => {
     refreshConfig();

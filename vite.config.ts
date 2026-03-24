@@ -20,5 +20,12 @@ export default defineConfig(async () => ({
     watch: {
       ignored: ["**/src-tauri/**"],
     },
+    proxy: {
+      "/lmstudio": {
+        target: "http://localhost:1234",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/lmstudio/, ""),
+      },
+    },
   },
 }));

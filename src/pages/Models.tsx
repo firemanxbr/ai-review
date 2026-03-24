@@ -26,9 +26,17 @@ function Models({ config, status, onConfigChange }: Props) {
     try {
       const list = await invoke<string[]>("list_models");
       setModels(list);
-    } catch (e) {
-      setError(String(e));
-      setModels([]);
+    } catch {
+      // Tauri IPC not available — fetch directly from LM Studio
+      try {
+        const resp = await fetch("/lmstudio/v1/models");
+        const data = await resp.json();
+        const ids = (data.data || []).map((m: { id: string }) => m.id);
+        setModels(ids);
+      } catch (e2) {
+        setError(String(e2));
+        setModels([]);
+      }
     } finally {
       setLoading(false);
     }
