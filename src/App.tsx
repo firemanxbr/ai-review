@@ -44,6 +44,45 @@ const defaultStatus: Status = {
 
 type Page = "dashboard" | "repos" | "models" | "activity" | "settings";
 
+const ACTIVITY_STORAGE_KEY = "ai-review-activity";
+const PAGE_STORAGE_KEY = "ai-review-page";
+const VALID_PAGES: Page[] = ["dashboard", "repos", "models", "activity", "settings"];
+
+function loadActivity(): ActivityItem[] {
+  try {
+    const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveActivity(items: ActivityItem[]): void {
+  try {
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+function loadPage(): Page {
+  try {
+    const stored = localStorage.getItem(PAGE_STORAGE_KEY) as Page | null;
+    if (stored && VALID_PAGES.includes(stored)) return stored;
+  } catch {
+    // localStorage unavailable
+  }
+  return "dashboard";
+}
+
+function savePage(page: Page): void {
+  try {
+    localStorage.setItem(PAGE_STORAGE_KEY, page);
+  } catch {
+    // localStorage unavailable
+  }
+}
+
 const NAV_ITEMS: { id: Page; label: string; icon: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "\u25A3" },
   { id: "repos", label: "Repositories", icon: "\u2691" },
@@ -53,10 +92,23 @@ const NAV_ITEMS: { id: Page; label: string; icon: string }[] = [
 ];
 
 function App() {
-  const [page, setPage] = useState<Page>("dashboard");
+  const [page, setPageState] = useState<Page>(loadPage);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [status, setStatus] = useState<Status>(defaultStatus);
-  const [liveActivity, setLiveActivity] = useState<ActivityItem[]>([]);
+  const [liveActivity, setLiveActivity] = useState<ActivityItem[]>(loadActivity);
+
+  const setPage = useCallback((p: Page) => {
+    setPageState(p);
+    savePage(p);
+  }, []);
+
+  const addActivity = useCallback((item: ActivityItem) => {
+    setLiveActivity((prev) => {
+      const updated = [item, ...prev].slice(0, 200);
+      saveActivity(updated);
+      return updated;
+    });
+  }, []);
 
   const refreshConfig = useCallback(async () => {
     try {
@@ -85,12 +137,12 @@ function App() {
 
   useEffect(() => {
     const unlisten = listen<ActivityItem>("activity", (event) => {
-      setLiveActivity((prev) => [event.payload, ...prev].slice(0, 100));
+      addActivity(event.payload);
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [addActivity]);
 
   // Browser-mode polling loop
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -117,7 +169,7 @@ function App() {
             ...event,
             timestamp: new Date().toISOString(),
           };
-          setLiveActivity((prev) => [item, ...prev].slice(0, 100));
+          addActivity(item);
         }
       );
     } else if (!shouldPoll && pollerActive.current) {
@@ -131,7 +183,7 @@ function App() {
         stopPolling();
       }
     };
-  }, [config, isTauri]);
+  }, [config, isTauri, addActivity]);
 
   const renderPage = () => {
     switch (page) {
