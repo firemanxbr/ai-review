@@ -414,6 +414,96 @@ body {
   border-radius: 4px;
 }
 
+/* PR group (collapsible) */
+.pr-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.pr-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.pr-group-summary:hover {
+  background: var(--bg-tertiary);
+}
+
+.pr-group-summary .message {
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.pr-group-summary .event-icon {
+  font-size: 14px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.pr-group-summary .timestamp {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.pr-group-summary .repo-tag {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+  min-width: 14px;
+  text-align: center;
+}
+
+.chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.pr-group-details {
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.pr-group-details .detail-item {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 12px 6px 44px;
+  font-size: 12px;
+}
+
+.pr-group-details .detail-item + .detail-item {
+  border-top: 1px solid var(--border);
+}
+
+/* PR link */
+.pr-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pr-link:hover {
+  text-decoration: underline;
+  color: var(--accent-hover);
+}
+
 /* Empty state */
 .empty-state {
   text-align: center;

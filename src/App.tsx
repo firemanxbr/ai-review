@@ -23,6 +23,8 @@ interface Status {
   polling_active: boolean;
   watched_repos_count: number;
   rate_limit_remaining: number | null;
+  rate_limit_total: number | null;
+  rate_limit_reset: number | null;
 }
 
 export interface ActivityItem {
@@ -31,6 +33,7 @@ export interface ActivityItem {
   pr_number: number | null;
   message: string;
   timestamp: string;
+  html_url?: string;
 }
 
 const defaultStatus: Status = {
@@ -40,6 +43,8 @@ const defaultStatus: Status = {
   polling_active: false,
   watched_repos_count: 0,
   rate_limit_remaining: null,
+  rate_limit_total: null,
+  rate_limit_reset: null,
 };
 
 type Page = "dashboard" | "repos" | "models" | "activity" | "settings";

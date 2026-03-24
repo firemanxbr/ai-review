@@ -16,10 +16,21 @@ interface Props {
     polling_active: boolean;
     watched_repos_count: number;
     rate_limit_remaining: number | null;
+    rate_limit_total: number | null;
+    rate_limit_reset: number | null;
   };
   activity: ActivityItem[];
   onRefresh: () => void;
   onConfigChange: () => void;
+}
+
+function formatResetTime(resetUnix: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = resetUnix - now;
+  if (diff <= 0) return "resetting now";
+  if (diff < 60) return `resets in ${diff}s`;
+  const mins = Math.ceil(diff / 60);
+  return `resets in ${mins}m`;
 }
 
 function eventIcon(eventType: string): string {
@@ -84,12 +95,17 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
           <span className="value">{status.watched_repos_count}</span>
         </div>
         <div className="status-card">
-          <span className="label">API Rate Limit</span>
+          <span className="label">API Rate Limit (per hour)</span>
           <span className="value">
             {status.rate_limit_remaining !== null
-              ? `${status.rate_limit_remaining} / 5000`
+              ? `${status.rate_limit_remaining} / ${status.rate_limit_total ?? 5000}`
               : "N/A"}
           </span>
+          {status.rate_limit_reset !== null && (
+            <span className="label" style={{ marginTop: "2px" }}>
+              {formatResetTime(status.rate_limit_reset)}
+            </span>
+          )}
         </div>
       </div>
 

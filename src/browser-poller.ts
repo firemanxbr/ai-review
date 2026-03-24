@@ -13,6 +13,7 @@ type ActivityHandler = (event: {
   repo: string;
   pr_number: number | null;
   message: string;
+  html_url?: string;
 }) => void;
 
 function getReviewed(): Set<string> {
@@ -152,9 +153,10 @@ function emit(
   eventType: string,
   repo: string,
   prNumber: number | null,
-  message: string
+  message: string,
+  htmlUrl?: string
 ) {
-  onActivity?.({ event_type: eventType, repo, pr_number: prNumber, message });
+  onActivity?.({ event_type: eventType, repo, pr_number: prNumber, message, html_url: htmlUrl });
 }
 
 async function pollOnce(
@@ -187,7 +189,8 @@ async function pollOnce(
           "pr_found",
           repo,
           pr.number,
-          `Found PR #${pr.number}: ${pr.title}`
+          `Found PR #${pr.number}: ${pr.title}`,
+          pr.html_url
         );
 
         // Fetch diff
@@ -199,7 +202,8 @@ async function pollOnce(
             "error",
             repo,
             pr.number,
-            `Failed to fetch diff: ${e instanceof Error ? e.message : e}`
+            `Failed to fetch diff: ${e instanceof Error ? e.message : e}`,
+            pr.html_url
           );
           continue;
         }
@@ -208,7 +212,8 @@ async function pollOnce(
           "reviewing",
           repo,
           pr.number,
-          `Reviewing PR #${pr.number} with model ${model}...`
+          `Reviewing PR #${pr.number} with model ${model}...`,
+          pr.html_url
         );
 
         // Review with LM Studio
@@ -220,7 +225,8 @@ async function pollOnce(
             "error",
             repo,
             pr.number,
-            `Review failed: ${e instanceof Error ? e.message : e}`
+            `Review failed: ${e instanceof Error ? e.message : e}`,
+            pr.html_url
           );
           continue;
         }
@@ -235,14 +241,16 @@ async function pollOnce(
             "review_posted",
             repo,
             pr.number,
-            `Review posted for PR #${pr.number}`
+            `Review posted for PR #${pr.number}`,
+            pr.html_url
           );
         } catch (e) {
           emit(
             "error",
             repo,
             pr.number,
-            `Failed to post review: ${e instanceof Error ? e.message : e}`
+            `Failed to post review: ${e instanceof Error ? e.message : e}`,
+            pr.html_url
           );
         }
       }

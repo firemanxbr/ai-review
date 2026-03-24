@@ -63,6 +63,8 @@ async function getStatusDirect(): Promise<{
   polling_active: boolean;
   watched_repos_count: number;
   rate_limit_remaining: number | null;
+  rate_limit_total: number | null;
+  rate_limit_reset: number | null;
 }> {
   let lmOnline = false;
   try {
@@ -75,6 +77,8 @@ async function getStatusDirect(): Promise<{
   let ghConnected = false;
   let ghUser: string | null = null;
   let rateRemaining: number | null = null;
+  let rateTotal: number | null = null;
+  let rateReset: number | null = null;
 
   if (browserConfig.github_pat) {
     try {
@@ -89,6 +93,8 @@ async function getStatusDirect(): Promise<{
       if (rateResp.ok) {
         const data = await rateResp.json();
         rateRemaining = data.resources?.core?.remaining ?? null;
+        rateTotal = data.resources?.core?.limit ?? null;
+        rateReset = data.resources?.core?.reset ?? null;
       }
     } catch {
       // Token invalid
@@ -102,6 +108,8 @@ async function getStatusDirect(): Promise<{
     polling_active: browserConfig.is_polling_active,
     watched_repos_count: browserConfig.watched_repos.length,
     rate_limit_remaining: rateRemaining,
+    rate_limit_total: rateTotal,
+    rate_limit_reset: rateReset,
   };
 }
 

@@ -14,6 +14,8 @@ pub struct StatusResponse {
     pub polling_active: bool,
     pub watched_repos_count: usize,
     pub rate_limit_remaining: Option<i64>,
+    pub rate_limit_total: Option<i64>,
+    pub rate_limit_reset: Option<i64>,
 }
 
 // --- Config commands ---
@@ -113,17 +115,16 @@ pub async fn get_status(state: State<'_, Arc<AppState>>) -> Result<StatusRespons
     let lmstudio = LmStudioClient::new(None);
     let lm_online = lmstudio.health_check().await.unwrap_or(false);
 
-    let (gh_connected, gh_user, rate_remaining) = if !pat.is_empty() {
+    let (gh_connected, gh_user, rate_remaining, rate_total, rate_reset) = if !pat.is_empty() {
         let gh = GitHubClient::new(&pat);
         let user = gh.validate_token().await.ok().map(|u| u.login);
-        let rate = gh
-            .get_rate_limit()
-            .await
-            .ok()
-            .map(|r| r.resources.core.remaining);
-        (user.is_some(), user, rate)
+        let rate_info = gh.get_rate_limit().await.ok();
+        let remaining = rate_info.as_ref().map(|r| r.resources.core.remaining);
+        let total = rate_info.as_ref().map(|r| r.resources.core.limit);
+        let reset = rate_info.as_ref().map(|r| r.resources.core.reset);
+        (user.is_some(), user, remaining, total, reset)
     } else {
-        (false, None, None)
+        (false, None, None, None, None)
     };
 
     Ok(StatusResponse {
@@ -133,6 +134,8 @@ pub async fn get_status(state: State<'_, Arc<AppState>>) -> Result<StatusRespons
         polling_active: polling,
         watched_repos_count: repos_count,
         rate_limit_remaining: rate_remaining,
+        rate_limit_total: rate_total,
+        rate_limit_reset: rate_reset,
     })
 }
 
