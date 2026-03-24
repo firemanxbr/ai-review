@@ -2,6 +2,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_URL: &str = "http://localhost:1234";
+/// Maximum number of characters to send from a diff to the LM Studio model.
+/// Larger diffs are truncated to stay within typical context window limits.
 const MAX_DIFF_CHARS: usize = 12000;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
