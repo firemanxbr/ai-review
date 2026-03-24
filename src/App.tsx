@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke, listen } from "./tauri";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Repos from "./pages/Repos";
@@ -67,25 +66,14 @@ function App() {
     }
   }, []);
 
-  const checkLmStudioDirect = useCallback(async (): Promise<boolean> => {
-    try {
-      const resp = await fetch("/lmstudio/v1/models");
-      return resp.ok;
-    } catch {
-      return false;
-    }
-  }, []);
-
   const refreshStatus = useCallback(async () => {
     try {
       const s = await invoke<Status>("get_status");
       setStatus(s);
-    } catch {
-      // Tauri IPC not available (running in browser) — check LM Studio directly
-      const lmOnline = await checkLmStudioDirect();
-      setStatus((prev) => ({ ...prev, lm_studio_online: lmOnline }));
+    } catch (e) {
+      console.error("Failed to load status:", e);
     }
-  }, [checkLmStudioDirect]);
+  }, []);
 
   useEffect(() => {
     refreshConfig();
