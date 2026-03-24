@@ -100,6 +100,7 @@ function App() {
             status={status}
             activity={liveActivity}
             onRefresh={refreshStatus}
+            onConfigChange={refreshConfig}
           />
         );
       case "repos":

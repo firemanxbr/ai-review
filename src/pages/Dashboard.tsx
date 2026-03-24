@@ -19,6 +19,7 @@ interface Props {
   };
   activity: ActivityItem[];
   onRefresh: () => void;
+  onConfigChange: () => void;
 }
 
 function eventIcon(eventType: string): string {
@@ -38,11 +39,12 @@ function eventIcon(eventType: string): string {
   }
 }
 
-function Dashboard({ config, status, activity, onRefresh }: Props) {
+function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Props) {
   const handleTogglePolling = async () => {
     if (!config) return;
     try {
       await invoke("toggle_polling", { active: !config.is_polling_active });
+      onConfigChange();
       onRefresh();
     } catch (e) {
       console.error(e);

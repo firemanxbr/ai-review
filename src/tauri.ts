@@ -3,15 +3,46 @@ import { listen as tauriListen } from "@tauri-apps/api/event";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-// In-memory config for browser dev mode
-let browserConfig = {
-  github_pat: "",
-  watched_repos: [] as string[],
-  selected_model: "",
-  poll_interval_secs: 10,
-  is_polling_active: false,
-  lm_studio_url: "http://localhost:1234",
-};
+const STORAGE_KEY = "ai-review-config";
+
+interface BrowserConfig {
+  github_pat: string;
+  watched_repos: string[];
+  selected_model: string;
+  poll_interval_secs: number;
+  is_polling_active: boolean;
+  lm_studio_url: string;
+}
+
+function loadConfig(): BrowserConfig {
+  const defaults: BrowserConfig = {
+    github_pat: "",
+    watched_repos: [],
+    selected_model: "",
+    poll_interval_secs: 10,
+    is_polling_active: false,
+    lm_studio_url: "http://localhost:1234",
+  };
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return { ...defaults, ...JSON.parse(stored) };
+    }
+  } catch {
+    // localStorage not available or corrupt
+  }
+  return defaults;
+}
+
+function saveConfig(config: BrowserConfig): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // localStorage not available
+  }
+}
+
+let browserConfig = loadConfig();
 
 async function validatePatDirect(pat: string): Promise<string> {
   const resp = await fetch("https://api.github.com/user", {
@@ -79,32 +110,39 @@ const browserHandlers: Record<string, (args: Record<string, unknown>) => unknown
   get_config: () => ({ ...browserConfig }),
   save_github_pat: (args) => {
     browserConfig.github_pat = args.pat as string;
+    saveConfig(browserConfig);
   },
   validate_github_pat: async (args) => {
     return await validatePatDirect(args.pat as string);
   },
   set_watched_repos: (args) => {
     browserConfig.watched_repos = args.repos as string[];
+    saveConfig(browserConfig);
   },
   add_watched_repo: (args) => {
     const repo = args.repo as string;
     if (!browserConfig.watched_repos.includes(repo)) {
       browserConfig.watched_repos.push(repo);
     }
+    saveConfig(browserConfig);
   },
   remove_watched_repo: (args) => {
     browserConfig.watched_repos = browserConfig.watched_repos.filter(
       (r) => r !== (args.repo as string)
     );
+    saveConfig(browserConfig);
   },
   set_selected_model: (args) => {
     browserConfig.selected_model = args.model as string;
+    saveConfig(browserConfig);
   },
   set_poll_interval: (args) => {
     browserConfig.poll_interval_secs = args.seconds as number;
+    saveConfig(browserConfig);
   },
   toggle_polling: (args) => {
     browserConfig.is_polling_active = args.active as boolean;
+    saveConfig(browserConfig);
   },
   get_status: async () => {
     return await getStatusDirect();
