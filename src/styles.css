@@ -658,3 +658,128 @@ body {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* State badges */
+.badge-merged {
+  background: rgba(163, 113, 247, 0.15);
+  color: #a371f7;
+}
+
+.badge-closed {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--error);
+}
+
+/* Insights charts grid */
+.insights-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Horizontal bar chart */
+.chart-horizontal-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chart-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chart-bar-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 70px;
+  text-align: right;
+}
+
+.chart-bar-label-repo {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-bar-track {
+  flex: 1;
+  height: 20px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chart-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+
+.chart-bar-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 30px;
+}
+
+.chart-bar-open { background: var(--accent); }
+.chart-bar-closed { background: var(--error); }
+.chart-bar-merged { background: #a371f7; }
+.chart-bar-critical { background: var(--error); }
+.chart-bar-warning { background: var(--warning); }
+.chart-bar-suggestion { background: var(--success); }
+.chart-bar-accent { background: var(--accent); }
+
+/* Vertical bar chart (timeline) */
+.chart-timeline {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 160px;
+  padding: 0 8px;
+}
+
+.chart-timeline-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.chart-timeline-bar-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.chart-timeline-bar-fill {
+  width: 70%;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  transition: height 0.4s ease;
+}
+
+.chart-timeline-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+
+.chart-timeline-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}

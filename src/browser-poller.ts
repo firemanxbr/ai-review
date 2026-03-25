@@ -1,11 +1,27 @@
 const REVIEWED_KEY = "ai-review-reviewed";
+const TRACKED_KEY = "ai-review-tracked-prs";
+
+interface TrackedPr {
+  repo: string;
+  number: number;
+  lastState: "open" | "closed" | "merged";
+  html_url: string;
+}
 
 interface PullRequest {
   number: number;
   title: string;
+  state: string;
+  merged_at: string | null;
   head: { sha: string; ref: string };
   user: { login: string };
   html_url: string;
+}
+
+interface ReviewSummary {
+  critical: number;
+  warning: number;
+  suggestion: number;
 }
 
 type ActivityHandler = (event: {
@@ -14,6 +30,10 @@ type ActivityHandler = (event: {
   pr_number: number | null;
   message: string;
   html_url?: string;
+  pr_state?: "closed" | "merged";
+  tokens_used?: number;
+  review_summary?: ReviewSummary;
+  diff_size?: number;
 }) => void;
 
 function getReviewed(): Set<string> {
@@ -32,6 +52,60 @@ function markReviewed(key: string): void {
     localStorage.setItem(REVIEWED_KEY, JSON.stringify([...reviewed]));
   } catch {
     // localStorage unavailable
+  }
+}
+
+function getTrackedPrs(): Map<string, TrackedPr> {
+  try {
+    const stored = localStorage.getItem(TRACKED_KEY);
+    if (!stored) return new Map();
+    const arr: TrackedPr[] = JSON.parse(stored);
+    return new Map(arr.map((p) => [`${p.repo}:${p.number}`, p]));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveTrackedPrs(tracked: Map<string, TrackedPr>): void {
+  try {
+    localStorage.setItem(TRACKED_KEY, JSON.stringify([...tracked.values()]));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+function trackPr(repo: string, number: number, state: "open" | "closed" | "merged", html_url: string): void {
+  const tracked = getTrackedPrs();
+  tracked.set(`${repo}:${number}`, { repo, number, lastState: state, html_url });
+  saveTrackedPrs(tracked);
+}
+
+async function fetchPrState(
+  repo: string,
+  prNumber: number,
+  pat: string
+): Promise<{ state: string; merged: boolean; html_url: string; title: string } | null> {
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${repo}/pulls/${prNumber}`,
+      {
+        headers: {
+          Authorization: `Bearer ${pat}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "AI-Review/0.1.0",
+        },
+      }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return {
+      state: data.state,
+      merged: !!data.merged_at,
+      html_url: data.html_url,
+      title: data.title,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -73,7 +147,7 @@ async function reviewWithLmStudio(
   model: string,
   prTitle: string,
   diff: string
-): Promise<string> {
+): Promise<{ content: string; tokens_used: number }> {
   const MAX_DIFF = 12000;
   const truncatedDiff =
     diff.length > MAX_DIFF
@@ -118,7 +192,9 @@ Keep the review concise and actionable. Focus on the most impactful findings.`,
     throw new Error(`LM Studio HTTP ${resp.status}: ${text}`);
   }
   const data = await resp.json();
-  return data.choices?.[0]?.message?.content || "No response from model";
+  const content = data.choices?.[0]?.message?.content || "No response from model";
+  const tokens_used = data.usage?.total_tokens ?? 0;
+  return { content, tokens_used };
 }
 
 async function postReview(
@@ -154,9 +230,29 @@ function emit(
   repo: string,
   prNumber: number | null,
   message: string,
-  htmlUrl?: string
+  htmlUrl?: string,
+  extras?: {
+    pr_state?: "closed" | "merged";
+    tokens_used?: number;
+    review_summary?: ReviewSummary;
+    diff_size?: number;
+  }
 ) {
-  onActivity?.({ event_type: eventType, repo, pr_number: prNumber, message, html_url: htmlUrl });
+  onActivity?.({
+    event_type: eventType,
+    repo,
+    pr_number: prNumber,
+    message,
+    html_url: htmlUrl,
+    ...extras,
+  });
+}
+
+function parseReviewSeverity(review: string): ReviewSummary {
+  const critical = (review.match(/🔴/g) || []).length;
+  const warning = (review.match(/🟡/g) || []).length;
+  const suggestion = (review.match(/🟢/g) || []).length;
+  return { critical, warning, suggestion };
 }
 
 async function pollOnce(
@@ -177,11 +273,58 @@ async function pollOnce(
   }
 
   const reviewed = getReviewed();
+  const tracked = getTrackedPrs();
+
+  // Check state changes on all tracked PRs
+  for (const [key, tp] of tracked) {
+    const prInfo = await fetchPrState(tp.repo, tp.number, pat);
+    if (!prInfo) continue;
+
+    const currentState: "open" | "closed" | "merged" =
+      prInfo.merged ? "merged" : prInfo.state === "closed" ? "closed" : "open";
+
+    if (currentState !== tp.lastState) {
+      if (currentState === "merged") {
+        emit(
+          "pr_merged",
+          tp.repo,
+          tp.number,
+          `PR #${tp.number} has been merged`,
+          tp.html_url,
+          { pr_state: "merged" }
+        );
+      } else if (currentState === "closed") {
+        emit(
+          "pr_closed",
+          tp.repo,
+          tp.number,
+          `PR #${tp.number} has been closed`,
+          tp.html_url,
+          { pr_state: "closed" }
+        );
+      } else if (currentState === "open" && (tp.lastState === "closed" || tp.lastState === "merged")) {
+        emit(
+          "pr_reopened",
+          tp.repo,
+          tp.number,
+          `PR #${tp.number} has been reopened`,
+          tp.html_url
+        );
+      }
+
+      tp.lastState = currentState;
+      tracked.set(key, tp);
+    }
+  }
+  saveTrackedPrs(tracked);
 
   for (const repo of repos) {
     try {
       const prs = await fetchOpenPRs(repo, pat);
       for (const pr of prs) {
+        // Track every open PR we see
+        trackPr(repo, pr.number, "open", pr.html_url);
+
         const dedupKey = `${repo}:${pr.number}:${pr.head.sha}`;
         if (reviewed.has(dedupKey)) continue;
 
@@ -216,10 +359,12 @@ async function pollOnce(
           pr.html_url
         );
 
+        const diffSize = diff.length;
+
         // Review with LM Studio
-        let review: string;
+        let reviewResult: { content: string; tokens_used: number };
         try {
-          review = await reviewWithLmStudio(model, pr.title, diff);
+          reviewResult = await reviewWithLmStudio(model, pr.title, diff);
         } catch (e) {
           emit(
             "error",
@@ -231,8 +376,10 @@ async function pollOnce(
           continue;
         }
 
+        const severity = parseReviewSeverity(reviewResult.content);
+
         // Post review to GitHub
-        const reviewBody = `## 🤖 AI Review (Local — powered by LM Studio)\n\n${review}\n\n---\n*Reviewed by [AI Review](https://github.com/firemanxbr/ai-review) using model \`${model}\`*`;
+        const reviewBody = `## 🤖 AI Review (Local — powered by LM Studio)\n\n${reviewResult.content}\n\n---\n*Reviewed by [AI Review](https://github.com/firemanxbr/ai-review) using model \`${model}\`*`;
 
         try {
           await postReview(repo, pr.number, reviewBody, pat);
@@ -242,7 +389,12 @@ async function pollOnce(
             repo,
             pr.number,
             `Review posted for PR #${pr.number}`,
-            pr.html_url
+            pr.html_url,
+            {
+              tokens_used: reviewResult.tokens_used,
+              review_summary: severity,
+              diff_size: diffSize,
+            }
           );
         } catch (e) {
           emit(
@@ -265,6 +417,30 @@ async function pollOnce(
   }
 }
 
+function seedTrackedPrsFromActivity(): void {
+  try {
+    const stored = localStorage.getItem("ai-review-activity");
+    if (!stored) return;
+    const items: { repo: string; pr_number: number | null; html_url?: string }[] = JSON.parse(stored);
+    const tracked = getTrackedPrs();
+    for (const item of items) {
+      if (!item.pr_number || !item.repo) continue;
+      const key = `${item.repo}:${item.pr_number}`;
+      if (!tracked.has(key)) {
+        tracked.set(key, {
+          repo: item.repo,
+          number: item.pr_number,
+          lastState: "open",
+          html_url: item.html_url || `https://github.com/${item.repo}/pull/${item.pr_number}`,
+        });
+      }
+    }
+    saveTrackedPrs(tracked);
+  } catch {
+    // ignore
+  }
+}
+
 export function startPolling(
   pat: string,
   repos: string[],
@@ -274,6 +450,9 @@ export function startPolling(
 ): void {
   stopPolling();
   onActivity = activityHandler;
+
+  // Seed tracked PRs from existing activity so state changes are detected
+  seedTrackedPrsFromActivity();
 
   const run = async () => {
     await pollOnce(pat, repos, model);
@@ -294,4 +473,22 @@ export function stopPolling(): void {
 
 export function isPollingRunning(): boolean {
   return pollingTimer !== null;
+}
+
+export async function fetchClosedPRs(
+  repo: string,
+  pat: string
+): Promise<{ number: number; title: string; state: string; merged_at: string | null; html_url: string }[]> {
+  const resp = await fetch(
+    `https://api.github.com/repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=30`,
+    {
+      headers: {
+        Authorization: `Bearer ${pat}`,
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "AI-Review/0.1.0",
+      },
+    }
+  );
+  if (!resp.ok) return [];
+  return resp.json();
 }

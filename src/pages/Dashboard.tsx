@@ -1,5 +1,6 @@
 import { invoke } from "../tauri";
 import type { ActivityItem } from "../App";
+import PrGroupRow, { groupByPr } from "../components/PrGroupRow";
 
 interface Props {
   config: {
@@ -33,23 +34,6 @@ function formatResetTime(resetUnix: number): string {
   return `resets in ${mins}m`;
 }
 
-function eventIcon(eventType: string): string {
-  switch (eventType) {
-    case "pr_found":
-      return "\uD83D\uDD0D";
-    case "reviewing":
-      return "\uD83E\uDD16";
-    case "review_posted":
-      return "\u2705";
-    case "error":
-      return "\u274C";
-    case "warning":
-      return "\u26A0\uFE0F";
-    default:
-      return "\u2139\uFE0F";
-  }
-}
-
 function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Props) {
   const handleTogglePolling = async () => {
     if (!config) return;
@@ -61,6 +45,8 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
       console.error(e);
     }
   };
+
+  const liveGroups = groupByPr(activity);
 
   return (
     <div>
@@ -137,15 +123,15 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
 
       <div className="card">
         <div className="card-header">
-          <h2>Live Activity</h2>
+          <h2>Live Session</h2>
           <span
             className="badge badge-success"
             style={{ fontSize: "11px" }}
           >
-            {activity.length} events
+            {liveGroups.length} PR(s)
           </span>
         </div>
-        {activity.length === 0 ? (
+        {liveGroups.length === 0 ? (
           <div className="empty-state">
             <div className="icon">{"\u23F3"}</div>
             <p>
@@ -155,15 +141,8 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
           </div>
         ) : (
           <div className="activity-feed">
-            {activity.slice(0, 20).map((item, i) => (
-              <div className="activity-item" key={i}>
-                <span className="event-icon">{eventIcon(item.event_type)}</span>
-                <span className="message">{item.message}</span>
-                {item.repo && <span className="repo-tag">{item.repo}</span>}
-                <span className="timestamp">
-                  {new Date(item.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
+            {liveGroups.map((group) => (
+              <PrGroupRow group={group} key={group.key} />
             ))}
           </div>
         )}

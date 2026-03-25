@@ -6,6 +6,7 @@ import Settings from "./pages/Settings";
 import Repos from "./pages/Repos";
 import Activity from "./pages/Activity";
 import Models from "./pages/Models";
+import Insights from "./pages/Insights";
 
 interface AppConfig {
   github_pat: string;
@@ -27,6 +28,12 @@ interface Status {
   rate_limit_reset: number | null;
 }
 
+export interface ReviewSummary {
+  critical: number;
+  warning: number;
+  suggestion: number;
+}
+
 export interface ActivityItem {
   event_type: string;
   repo: string;
@@ -34,6 +41,10 @@ export interface ActivityItem {
   message: string;
   timestamp: string;
   html_url?: string;
+  pr_state?: "closed" | "merged";
+  tokens_used?: number;
+  review_summary?: ReviewSummary;
+  diff_size?: number;
 }
 
 const defaultStatus: Status = {
@@ -47,11 +58,11 @@ const defaultStatus: Status = {
   rate_limit_reset: null,
 };
 
-type Page = "dashboard" | "repos" | "models" | "activity" | "settings";
+type Page = "dashboard" | "repos" | "models" | "activity" | "insights" | "settings";
 
 const ACTIVITY_STORAGE_KEY = "ai-review-activity";
 const PAGE_STORAGE_KEY = "ai-review-page";
-const VALID_PAGES: Page[] = ["dashboard", "repos", "models", "activity", "settings"];
+const VALID_PAGES: Page[] = ["dashboard", "repos", "models", "activity", "insights", "settings"];
 
 function loadActivity(): ActivityItem[] {
   try {
@@ -93,6 +104,7 @@ const NAV_ITEMS: { id: Page; label: string; icon: string }[] = [
   { id: "repos", label: "Repositories", icon: "\u2691" },
   { id: "models", label: "Models", icon: "\u2699" },
   { id: "activity", label: "Activity", icon: "\u2261" },
+  { id: "insights", label: "Insights", icon: "\u2609" },
   { id: "settings", label: "Settings", icon: "\u2638" },
 ];
 
@@ -214,6 +226,8 @@ function App() {
         );
       case "activity":
         return <Activity liveActivity={liveActivity} />;
+      case "insights":
+        return <Insights activity={liveActivity} />;
       case "settings":
         return (
           <Settings
