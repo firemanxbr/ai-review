@@ -76,10 +76,13 @@ function saveTrackedPrs(tracked: Map<string, TrackedPr>): void {
   }
 }
 
-function trackPr(repo: string, number: number, state: "open" | "closed" | "merged", html_url: string): void {
+function ensureTracked(repo: string, number: number, html_url: string): void {
   const tracked = getTrackedPrs();
-  tracked.set(`${repo}:${number}`, { repo, number, lastState: state, html_url });
-  saveTrackedPrs(tracked);
+  const key = `${repo}:${number}`;
+  if (!tracked.has(key)) {
+    tracked.set(key, { repo, number, lastState: "open", html_url });
+    saveTrackedPrs(tracked);
+  }
 }
 
 async function fetchPrState(
@@ -266,22 +269,9 @@ async function pollOnce(
   repos: string[],
   model: string
 ): Promise<void> {
-  // Check LM Studio health
-  try {
-    const health = await fetch("/lmstudio/v1/models");
-    if (!health.ok) {
-      emit("warning", "", null, "LM Studio is not running");
-      return;
-    }
-  } catch {
-    emit("warning", "", null, "LM Studio is not reachable");
-    return;
-  }
-
-  const reviewed = getReviewed();
   const tracked = getTrackedPrs();
 
-  // Check state changes on all tracked PRs
+  // Check state changes on all tracked PRs (runs regardless of LM Studio status)
   for (const [key, tp] of tracked) {
     const prInfo = await fetchPrState(tp.repo, tp.number, pat);
     if (!prInfo) continue;
@@ -325,12 +315,64 @@ async function pollOnce(
   }
   saveTrackedPrs(tracked);
 
+  // Check LM Studio health (only needed for reviewing new PRs)
+  let lmStudioOnline = false;
+  try {
+    const health = await fetch("/lmstudio/v1/models");
+    lmStudioOnline = health.ok;
+  } catch {
+    // LM Studio not reachable
+  }
+
+  if (!lmStudioOnline) {
+    emit("warning", "", null, "LM Studio is not running — PR state tracking still active");
+    return;
+  }
+
+  const reviewed = getReviewed();
+
+  // Reconcile: if a tracked PR is "open" but the activity log has a stale
+  // closed/merged event as the latest, re-emit pr_reopened
+  try {
+    const stored = localStorage.getItem("ai-review-activity");
+    if (stored) {
+      const activityItems: { event_type: string; repo: string; pr_number: number | null }[] = JSON.parse(stored);
+      const latestEventByPr = new Map<string, string>();
+      for (const item of activityItems) {
+        if (!item.pr_number) continue;
+        const key = `${item.repo}:${item.pr_number}`;
+        if (!latestEventByPr.has(key)) {
+          latestEventByPr.set(key, item.event_type);
+        }
+      }
+      const currentTracked = getTrackedPrs();
+      for (const [key, tp] of currentTracked) {
+        const latestEvent = latestEventByPr.get(key);
+        if (
+          tp.lastState === "open" &&
+          (latestEvent === "pr_closed" || latestEvent === "pr_merged")
+        ) {
+          emit(
+            "pr_reopened",
+            tp.repo,
+            tp.number,
+            `PR #${tp.number} has been reopened`,
+            tp.html_url,
+            { pr_state: "reopened" }
+          );
+        }
+      }
+    }
+  } catch {
+    // ignore reconciliation errors
+  }
+
   for (const repo of repos) {
     try {
       const prs = await fetchOpenPRs(repo, pat);
       for (const pr of prs) {
-        // Track every open PR we see
-        trackPr(repo, pr.number, "open", pr.html_url);
+        // Ensure this PR is in the tracked set (won't overwrite existing state)
+        ensureTracked(repo, pr.number, pr.html_url);
 
         const dedupKey = `${repo}:${pr.number}:${pr.head.sha}`;
         if (reviewed.has(dedupKey)) continue;

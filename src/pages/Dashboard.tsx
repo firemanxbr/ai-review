@@ -46,7 +46,9 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
     }
   };
 
-  const liveGroups = groupByPr(activity);
+  const allGroups = groupByPr(activity);
+  // Only show open/reopened PRs in Live Session (same logic as Activity page)
+  const liveGroups = allGroups.filter((g) => !g.prState || g.prState === "reopened");
 
   return (
     <div>
