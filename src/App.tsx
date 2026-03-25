@@ -69,7 +69,23 @@ const VALID_PAGES: Page[] = ["dashboard", "repos", "models", "activity", "insigh
 function loadActivity(): ActivityItem[] {
   try {
     const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    const items: ActivityItem[] = JSON.parse(stored);
+    // Deduplicate state-change events on load
+    const stateEvents = new Set(["pr_merged", "pr_closed", "pr_reopened"]);
+    const seen = new Set<string>();
+    const deduped = items.filter((item) => {
+      if (stateEvents.has(item.event_type) && item.pr_number) {
+        const key = `${item.event_type}:${item.repo}:${item.pr_number}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    });
+    if (deduped.length !== items.length) {
+      saveActivity(deduped);
+    }
+    return deduped;
   } catch {
     return [];
   }
@@ -123,6 +139,17 @@ function App() {
 
   const addActivity = useCallback((item: ActivityItem) => {
     setLiveActivity((prev) => {
+      // Deduplicate state-change events (merged/closed/reopened) per PR
+      const stateEvents = new Set(["pr_merged", "pr_closed", "pr_reopened"]);
+      if (stateEvents.has(item.event_type) && item.pr_number) {
+        const alreadyExists = prev.some(
+          (a) =>
+            a.event_type === item.event_type &&
+            a.repo === item.repo &&
+            a.pr_number === item.pr_number
+        );
+        if (alreadyExists) return prev;
+      }
       const updated = [item, ...prev].slice(0, 200);
       saveActivity(updated);
       return updated;
