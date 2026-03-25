@@ -16,7 +16,7 @@ interface Props {
   liveActivity: ActivityItem[];
 }
 
-function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: string; prState?: "closed" | "merged"; events: DbActivity[] } }) {
+function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: string; prState?: "closed" | "merged" | "reopened"; events: DbActivity[] } }) {
   const [expanded, setExpanded] = useState(false);
   const latest = group.events[0];
 
@@ -49,7 +49,13 @@ function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: s
           {" — "}{statusText}
         </span>
         {group.prState && (
-          <span className={`badge ${group.prState === "merged" ? "badge-merged" : "badge-closed"}`}>
+          <span className={`badge ${
+            group.prState === "merged"
+              ? "badge-merged"
+              : group.prState === "reopened"
+                ? "badge-reopened"
+                : "badge-closed"
+          }`}>
             {group.prState}
           </span>
         )}
@@ -72,8 +78,8 @@ function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: s
   );
 }
 
-function groupDbByPr(items: DbActivity[]): { key: string; prNumber: number; repo: string; prState?: "closed" | "merged"; events: DbActivity[] }[] {
-  const groups = new Map<string, { key: string; prNumber: number; repo: string; prState?: "closed" | "merged"; events: DbActivity[] }>();
+function groupDbByPr(items: DbActivity[]): { key: string; prNumber: number; repo: string; prState?: "closed" | "merged" | "reopened"; events: DbActivity[] }[] {
+  const groups = new Map<string, { key: string; prNumber: number; repo: string; prState?: "closed" | "merged" | "reopened"; events: DbActivity[] }>();
   for (const item of items) {
     const pr = item.pr_number ?? 0;
     const key = pr ? `${item.repo}:${pr}` : `standalone-${item.id}`;
@@ -107,9 +113,10 @@ function Activity({ liveActivity }: Props) {
   const liveGroups = groupByPr(liveActivity);
   const dbGroups = groupDbByPr(dbActivity);
 
-  // Separate live groups: PRs with pr_state (closed/merged) go to history
-  const activeLiveGroups = liveGroups.filter((g) => !g.prState);
-  const closedLiveGroups = liveGroups.filter((g) => !!g.prState);
+  // Separate live groups: PRs with pr_state closed/merged go to history
+  // Reopened PRs stay in Live Session (they're active again)
+  const activeLiveGroups = liveGroups.filter((g) => !g.prState || g.prState === "reopened");
+  const closedLiveGroups = liveGroups.filter((g) => g.prState === "closed" || g.prState === "merged");
 
   return (
     <div>

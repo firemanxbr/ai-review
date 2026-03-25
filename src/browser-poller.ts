@@ -20,7 +20,9 @@ interface PullRequest {
 
 interface ReviewSummary {
   critical: number;
-  warning: number;
+  high: number;
+  moderate: number;
+  low: number;
   suggestion: number;
 }
 
@@ -30,7 +32,7 @@ type ActivityHandler = (event: {
   pr_number: number | null;
   message: string;
   html_url?: string;
-  pr_state?: "closed" | "merged";
+  pr_state?: "closed" | "merged" | "reopened";
   tokens_used?: number;
   review_summary?: ReviewSummary;
   diff_size?: number;
@@ -170,9 +172,11 @@ async function reviewWithLmStudio(
 4. **Style & Formatting** — consistency, conventions
 
 Format your review as markdown with severity ratings:
-- 🔴 Critical — must fix before merge
-- 🟡 Warning — should address
-- 🟢 Suggestion — nice to have
+- 🔴 Critical — must fix before merge, security vulnerabilities, data loss risks
+- 🟠 High — significant issues that should be fixed, logic errors, performance problems
+- 🟡 Moderate — should address, code quality concerns, maintainability issues
+- 🔵 Low — minor issues, style inconsistencies, small improvements
+- 🟢 Suggestion — nice to have, optional enhancements
 
 End with a brief summary and an overall recommendation (approve / request changes / comment only).
 
@@ -232,7 +236,7 @@ function emit(
   message: string,
   htmlUrl?: string,
   extras?: {
-    pr_state?: "closed" | "merged";
+    pr_state?: "closed" | "merged" | "reopened";
     tokens_used?: number;
     review_summary?: ReviewSummary;
     diff_size?: number;
@@ -250,9 +254,11 @@ function emit(
 
 function parseReviewSeverity(review: string): ReviewSummary {
   const critical = (review.match(/🔴/g) || []).length;
-  const warning = (review.match(/🟡/g) || []).length;
+  const high = (review.match(/🟠/g) || []).length;
+  const moderate = (review.match(/🟡/g) || []).length;
+  const low = (review.match(/🔵/g) || []).length;
   const suggestion = (review.match(/🟢/g) || []).length;
-  return { critical, warning, suggestion };
+  return { critical, high, moderate, low, suggestion };
 }
 
 async function pollOnce(
@@ -308,7 +314,8 @@ async function pollOnce(
           tp.repo,
           tp.number,
           `PR #${tp.number} has been reopened`,
-          tp.html_url
+          tp.html_url,
+          { pr_state: "reopened" }
         );
       }
 
@@ -421,8 +428,29 @@ function seedTrackedPrsFromActivity(): void {
   try {
     const stored = localStorage.getItem("ai-review-activity");
     if (!stored) return;
-    const items: { repo: string; pr_number: number | null; html_url?: string }[] = JSON.parse(stored);
+    const items: { event_type: string; repo: string; pr_number: number | null; html_url?: string; pr_state?: string }[] = JSON.parse(stored);
     const tracked = getTrackedPrs();
+
+    // First pass: find PRs not yet tracked
+    // Second pass: determine their latest known state from activity
+    const prLatestState = new Map<string, "open" | "closed" | "merged">();
+    for (const item of items) {
+      if (!item.pr_number || !item.repo) continue;
+      const key = `${item.repo}:${item.pr_number}`;
+      // Activity is newest-first, so first match wins
+      if (!prLatestState.has(key)) {
+        if (item.event_type === "pr_merged") {
+          prLatestState.set(key, "merged");
+        } else if (item.event_type === "pr_closed") {
+          prLatestState.set(key, "closed");
+        } else if (item.event_type === "pr_reopened") {
+          prLatestState.set(key, "open");
+        } else {
+          prLatestState.set(key, "open");
+        }
+      }
+    }
+
     for (const item of items) {
       if (!item.pr_number || !item.repo) continue;
       const key = `${item.repo}:${item.pr_number}`;
@@ -430,7 +458,7 @@ function seedTrackedPrsFromActivity(): void {
         tracked.set(key, {
           repo: item.repo,
           number: item.pr_number,
-          lastState: "open",
+          lastState: prLatestState.get(key) ?? "open",
           html_url: item.html_url || `https://github.com/${item.repo}/pull/${item.pr_number}`,
         });
       }

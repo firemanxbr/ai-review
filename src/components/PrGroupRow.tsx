@@ -53,7 +53,7 @@ export interface PrGroup {
   prNumber: number;
   htmlUrl?: string;
   events: ActivityItem[];
-  prState?: "closed" | "merged";
+  prState?: "closed" | "merged" | "reopened";
 }
 
 export function groupByPr(items: ActivityItem[]): PrGroup[] {
@@ -68,7 +68,6 @@ export function groupByPr(items: ActivityItem[]): PrGroup[] {
         prNumber: item.pr_number,
         htmlUrl: item.html_url,
         events: [],
-        prState: item.pr_state,
       });
     }
     const group = groups.get(key)!;
@@ -76,6 +75,7 @@ export function groupByPr(items: ActivityItem[]): PrGroup[] {
     if (item.html_url && !group.htmlUrl) {
       group.htmlUrl = item.html_url;
     }
+    // Use the latest (most recent) pr_state — activity is newest-first
     if (item.pr_state && !group.prState) {
       group.prState = item.pr_state;
     }
@@ -139,7 +139,13 @@ export default function PrGroupRow({ group, showState }: Props) {
         </span>
         {showState && group.prState && (
           <span
-            className={`badge ${group.prState === "merged" ? "badge-merged" : "badge-closed"}`}
+            className={`badge ${
+              group.prState === "merged"
+                ? "badge-merged"
+                : group.prState === "reopened"
+                  ? "badge-reopened"
+                  : "badge-closed"
+            }`}
           >
             {group.prState}
           </span>

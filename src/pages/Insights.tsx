@@ -20,15 +20,23 @@ function Insights({ activity }: Props) {
     (sum, a) => sum + (a.review_summary?.critical ?? 0),
     0
   );
-  const totalWarnings = reviewEvents.reduce(
-    (sum, a) => sum + (a.review_summary?.warning ?? 0),
+  const totalHigh = reviewEvents.reduce(
+    (sum, a) => sum + (a.review_summary?.high ?? 0),
+    0
+  );
+  const totalModerate = reviewEvents.reduce(
+    (sum, a) => sum + (a.review_summary?.moderate ?? 0),
+    0
+  );
+  const totalLow = reviewEvents.reduce(
+    (sum, a) => sum + (a.review_summary?.low ?? 0),
     0
   );
   const totalSuggestions = reviewEvents.reduce(
     (sum, a) => sum + (a.review_summary?.suggestion ?? 0),
     0
   );
-  const totalFindings = totalCritical + totalWarnings + totalSuggestions;
+  const totalFindings = totalCritical + totalHigh + totalModerate + totalLow;
 
   const totalDiffSize = reviewEvents.reduce(
     (sum, a) => sum + (a.diff_size ?? 0),
@@ -46,8 +54,13 @@ function Insights({ activity }: Props) {
       .filter((a) => a.pr_state === "closed" && a.pr_number)
       .map((a) => `${a.repo}:${a.pr_number}`)
   );
+  const reopenedPrs = new Set(
+    activity
+      .filter((a) => a.pr_state === "reopened" && a.pr_number)
+      .map((a) => `${a.repo}:${a.pr_number}`)
+  );
   const openPrs = new Set(
-    [...allPrs].filter((k) => !mergedPrs.has(k) && !closedPrs.has(k))
+    [...allPrs].filter((k) => !mergedPrs.has(k) && !closedPrs.has(k) && !reopenedPrs.has(k))
   );
 
   // Activity timeline (last 7 days)
@@ -78,10 +91,10 @@ function Insights({ activity }: Props) {
   const maxRepoCount = Math.max(...topRepos.map((r) => r[1]), 1);
 
   // Severity chart max
-  const maxSeverity = Math.max(totalCritical, totalWarnings, totalSuggestions, 1);
+  const maxSeverity = Math.max(totalCritical, totalHigh, totalModerate, totalLow, 1);
 
   // PR status max
-  const maxPrStatus = Math.max(openPrs.size, closedPrs.size, mergedPrs.size, 1);
+  const maxPrStatus = Math.max(openPrs.size, closedPrs.size, mergedPrs.size, reopenedPrs.size, 1);
 
   return (
     <div>
@@ -131,15 +144,15 @@ function Insights({ activity }: Props) {
           </span>
         </div>
         <div className="status-card">
-          <span className="label">Warnings</span>
-          <span className="value" style={{ color: totalWarnings > 0 ? "var(--warning)" : undefined }}>
-            {totalWarnings}
-          </span>
-        </div>
-        <div className="status-card">
           <span className="label">Suggestions</span>
           <span className="value" style={{ color: totalSuggestions > 0 ? "var(--success)" : undefined }}>
             {totalSuggestions}
+          </span>
+        </div>
+        <div className="status-card">
+          <span className="label">High Issues</span>
+          <span className="value" style={{ color: totalHigh > 0 ? "#f0883e" : undefined }}>
+            {totalHigh}
           </span>
         </div>
       </div>
@@ -161,6 +174,16 @@ function Insights({ activity }: Props) {
                 />
               </div>
               <span className="chart-bar-value">{openPrs.size}</span>
+            </div>
+            <div className="chart-bar-row">
+              <span className="chart-bar-label">Re-Opened</span>
+              <div className="chart-bar-track">
+                <div
+                  className="chart-bar-fill chart-bar-reopened"
+                  style={{ width: `${(reopenedPrs.size / maxPrStatus) * 100}%` }}
+                />
+              </div>
+              <span className="chart-bar-value">{reopenedPrs.size}</span>
             </div>
             <div className="chart-bar-row">
               <span className="chart-bar-label">Closed</span>
@@ -202,24 +225,34 @@ function Insights({ activity }: Props) {
               <span className="chart-bar-value">{totalCritical}</span>
             </div>
             <div className="chart-bar-row">
-              <span className="chart-bar-label">Warning</span>
+              <span className="chart-bar-label">High</span>
               <div className="chart-bar-track">
                 <div
-                  className="chart-bar-fill chart-bar-warning"
-                  style={{ width: `${(totalWarnings / maxSeverity) * 100}%` }}
+                  className="chart-bar-fill chart-bar-high"
+                  style={{ width: `${(totalHigh / maxSeverity) * 100}%` }}
                 />
               </div>
-              <span className="chart-bar-value">{totalWarnings}</span>
+              <span className="chart-bar-value">{totalHigh}</span>
             </div>
             <div className="chart-bar-row">
-              <span className="chart-bar-label">Suggestion</span>
+              <span className="chart-bar-label">Moderate</span>
               <div className="chart-bar-track">
                 <div
-                  className="chart-bar-fill chart-bar-suggestion"
-                  style={{ width: `${(totalSuggestions / maxSeverity) * 100}%` }}
+                  className="chart-bar-fill chart-bar-moderate"
+                  style={{ width: `${(totalModerate / maxSeverity) * 100}%` }}
                 />
               </div>
-              <span className="chart-bar-value">{totalSuggestions}</span>
+              <span className="chart-bar-value">{totalModerate}</span>
+            </div>
+            <div className="chart-bar-row">
+              <span className="chart-bar-label">Low</span>
+              <div className="chart-bar-track">
+                <div
+                  className="chart-bar-fill chart-bar-low"
+                  style={{ width: `${(totalLow / maxSeverity) * 100}%` }}
+                />
+              </div>
+              <span className="chart-bar-value">{totalLow}</span>
             </div>
           </div>
         </div>

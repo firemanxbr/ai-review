@@ -670,6 +670,11 @@ body {
   color: var(--error);
 }
 
+.badge-reopened {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--success);
+}
+
 /* Insights charts grid */
 .insights-charts-grid {
   display: grid;
@@ -731,11 +736,13 @@ body {
 }
 
 .chart-bar-open { background: var(--accent); }
+.chart-bar-reopened { background: var(--success); }
 .chart-bar-closed { background: var(--error); }
 .chart-bar-merged { background: #a371f7; }
 .chart-bar-critical { background: var(--error); }
-.chart-bar-warning { background: var(--warning); }
-.chart-bar-suggestion { background: var(--success); }
+.chart-bar-high { background: #f0883e; }
+.chart-bar-moderate { background: var(--warning); }
+.chart-bar-low { background: var(--accent); }
 .chart-bar-accent { background: var(--accent); }
 
 /* Vertical bar chart (timeline) */

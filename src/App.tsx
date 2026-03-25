@@ -30,7 +30,9 @@ interface Status {
 
 export interface ReviewSummary {
   critical: number;
-  warning: number;
+  high: number;
+  moderate: number;
+  low: number;
   suggestion: number;
 }
 
@@ -41,7 +43,7 @@ export interface ActivityItem {
   message: string;
   timestamp: string;
   html_url?: string;
-  pr_state?: "closed" | "merged";
+  pr_state?: "closed" | "merged" | "reopened";
   tokens_used?: number;
   review_summary?: ReviewSummary;
   diff_size?: number;
