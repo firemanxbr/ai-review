@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ActivityItem } from "../App";
+import { openUrl } from "../tauri";
 
 export function eventIcon(eventType: string): string {
   switch (eventType) {
@@ -80,15 +81,7 @@ export function groupByPr(items: ActivityItem[]): PrGroup[] {
       group.prState = item.pr_state;
     }
   }
-  const standalone: PrGroup[] = items
-    .filter((i) => !i.pr_number)
-    .map((i, idx) => ({
-      key: `standalone-${idx}`,
-      repo: i.repo,
-      prNumber: 0,
-      events: [i],
-    }));
-  return [...groups.values(), ...standalone];
+  return [...groups.values()];
 }
 
 interface Props {
@@ -100,19 +93,6 @@ export default function PrGroupRow({ group, showState }: Props) {
   const [expanded, setExpanded] = useState(false);
   const latest = group.events[0];
 
-  if (group.prNumber === 0) {
-    return (
-      <div className="activity-item">
-        <span className="event-icon">{eventIcon(latest.event_type)}</span>
-        <span className="message">{latest.message}</span>
-        {latest.repo && <span className="repo-tag">{latest.repo}</span>}
-        <span className="timestamp">
-          {new Date(latest.timestamp).toLocaleTimeString()}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div className="pr-group">
       <div
@@ -121,19 +101,18 @@ export default function PrGroupRow({ group, showState }: Props) {
       >
         <span className="event-icon">{summaryIcon(group.events)}</span>
         <span className="message">
-          {group.htmlUrl ? (
-            <a
-              href={group.htmlUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="pr-link"
-              onClick={(e) => e.stopPropagation()}
-            >
-              PR #{group.prNumber}
-            </a>
-          ) : (
-            `PR #${group.prNumber}`
-          )}
+          <a
+            className="pr-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              const url = group.htmlUrl || `https://github.com/${group.repo}/pull/${group.prNumber}`;
+              openUrl(url);
+            }}
+            href={group.htmlUrl || `https://github.com/${group.repo}/pull/${group.prNumber}`}
+          >
+            PR #{group.prNumber}
+          </a>
           {" — "}
           {summaryStatus(group.events)}
         </span>

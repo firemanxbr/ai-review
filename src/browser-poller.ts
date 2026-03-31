@@ -231,6 +231,8 @@ async function postReview(
 
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let onActivity: ActivityHandler | null = null;
+let lmStudioWarned = false;
+const failedPrs = new Set<string>();
 
 function emit(
   eventType: string,
@@ -325,9 +327,13 @@ async function pollOnce(
   }
 
   if (!lmStudioOnline) {
-    emit("warning", "", null, "LM Studio is not running — PR state tracking still active");
+    if (!lmStudioWarned) {
+      emit("warning", "", null, "LM Studio is not running — PR state tracking still active");
+      lmStudioWarned = true;
+    }
     return;
   }
+  lmStudioWarned = false;
 
   const reviewed = getReviewed();
 
@@ -376,6 +382,7 @@ async function pollOnce(
 
         const dedupKey = `${repo}:${pr.number}:${pr.head.sha}`;
         if (reviewed.has(dedupKey)) continue;
+        if (failedPrs.has(dedupKey)) continue;
 
         emit(
           "pr_found",
@@ -390,6 +397,7 @@ async function pollOnce(
         try {
           diff = await fetchDiff(repo, pr.number, pat);
         } catch (e) {
+          failedPrs.add(dedupKey);
           emit(
             "error",
             repo,
@@ -415,6 +423,7 @@ async function pollOnce(
         try {
           reviewResult = await reviewWithLmStudio(model, pr.title, diff);
         } catch (e) {
+          failedPrs.add(dedupKey);
           emit(
             "error",
             repo,
@@ -446,6 +455,7 @@ async function pollOnce(
             }
           );
         } catch (e) {
+          failedPrs.add(dedupKey);
           emit(
             "error",
             repo,
@@ -520,6 +530,8 @@ export function startPolling(
 ): void {
   stopPolling();
   onActivity = activityHandler;
+  lmStudioWarned = false;
+  failedPrs.clear();
 
   // Seed tracked PRs from existing activity so state changes are detected
   seedTrackedPrsFromActivity();

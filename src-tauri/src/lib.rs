@@ -13,6 +13,7 @@ pub fn run() {
     let app_state = Arc::new(AppState::new());
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .manage(app_state.clone())
         .setup(move |app| {
             if cfg!(debug_assertions) {

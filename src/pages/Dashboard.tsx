@@ -130,7 +130,7 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
             className="badge badge-success"
             style={{ fontSize: "11px" }}
           >
-            {liveGroups.length} PR(s)
+            {liveGroups.length}
           </span>
         </div>
         {liveGroups.length === 0 ? (

@@ -1,5 +1,6 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen } from "@tauri-apps/api/event";
+import { openUrl as tauriOpenUrl } from "@tauri-apps/plugin-opener";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -180,6 +181,14 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
     throw new Error(`No browser handler for command: ${cmd}`);
   }
   return (await handler(args || {})) as T;
+}
+
+export async function openUrl(url: string): Promise<void> {
+  if (isTauri) {
+    await tauriOpenUrl(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 }
 
 export async function listen<T>(
