@@ -109,6 +109,12 @@ function Activity({ liveActivity }: Props) {
   const liveGroups = groupByPr(liveActivity);
   const dbGroups = groupDbByPr(dbActivity);
 
+  // Deduplicate: DB groups that already exist in live activity are excluded
+  // Live data has all events (pr_found, reviewing, review_posted, etc.)
+  // while DB only has review_posted — live version is more complete
+  const liveKeys = new Set(liveGroups.map((g) => g.key));
+  const uniqueDbGroups = dbGroups.filter((g) => !liveKeys.has(g.key));
+
   // Separate live groups: PRs with pr_state closed/merged go to history
   // Reopened PRs stay in Live Session (they're active again)
   const activeLiveGroups = liveGroups.filter((g) => !g.prState || g.prState === "reopened");
@@ -141,10 +147,10 @@ function Activity({ liveActivity }: Props) {
         <div className="card-header">
           <h2>History</h2>
           <span className="badge badge-success">
-            {closedLiveGroups.length + dbGroups.length} reviews
+            {closedLiveGroups.length + uniqueDbGroups.length} reviews
           </span>
         </div>
-        {closedLiveGroups.length === 0 && dbGroups.length === 0 ? (
+        {closedLiveGroups.length === 0 && uniqueDbGroups.length === 0 ? (
           <div className="empty-state">
             <div className="icon">{"\uD83D\uDCDC"}</div>
             <p>
@@ -156,7 +162,7 @@ function Activity({ liveActivity }: Props) {
             {closedLiveGroups.map((group) => (
               <PrGroupRow group={group} showState key={group.key} />
             ))}
-            {dbGroups.map((group) => (
+            {uniqueDbGroups.map((group) => (
               <DbGroupRow group={group} key={group.key} />
             ))}
           </div>

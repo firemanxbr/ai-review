@@ -2,7 +2,7 @@ use crate::github::GitHubClient;
 use crate::lmstudio::LmStudioClient;
 use crate::state::AppState;
 use log::{error, info};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::time::{sleep, Duration};
@@ -12,6 +12,8 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
 
     let mut lm_studio_warned = false;
     let mut failed_prs: HashSet<String> = HashSet::new();
+    // Track PR states: key = "repo:pr_number", value = "open" | "closed" | "merged"
+    let mut tracked_states: HashMap<String, String> = HashMap::new();
 
     loop {
         let interval = {
@@ -46,6 +48,50 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
         let github = GitHubClient::new(&token);
         let lmstudio = LmStudioClient::new(None);
 
+        // Check state changes on all reviewed PRs (runs regardless of LM Studio)
+        let reviewed_prs = state.db.get_reviewed_prs();
+        for (repo, pr_number) in &reviewed_prs {
+            let track_key = format!("{}:{}", repo, pr_number);
+            let last_state = tracked_states.get(&track_key).cloned().unwrap_or_else(|| "open".to_string());
+
+            match github.get_pr(repo, *pr_number).await {
+                Ok(pr) => {
+                    let current_state = if pr.merged_at.is_some() {
+                        "merged"
+                    } else if pr.state == "closed" {
+                        "closed"
+                    } else {
+                        "open"
+                    };
+
+                    if current_state != last_state {
+                        match current_state {
+                            "merged" => {
+                                emit_activity_full(&app, "pr_merged", repo, Some(*pr_number),
+                                    &format!("PR #{} has been merged", pr_number),
+                                    Some(&pr.html_url), Some("merged"));
+                            }
+                            "closed" => {
+                                emit_activity_full(&app, "pr_closed", repo, Some(*pr_number),
+                                    &format!("PR #{} has been closed", pr_number),
+                                    Some(&pr.html_url), Some("closed"));
+                            }
+                            "open" if last_state == "closed" || last_state == "merged" => {
+                                emit_activity_full(&app, "pr_reopened", repo, Some(*pr_number),
+                                    &format!("PR #{} has been reopened", pr_number),
+                                    Some(&pr.html_url), Some("reopened"));
+                            }
+                            _ => {}
+                        }
+                        tracked_states.insert(track_key, current_state.to_string());
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to check state for {}#{}: {}", repo, pr_number, e);
+                }
+            }
+        }
+
         // Check LM Studio health
         match lmstudio.health_check().await {
             Ok(true) => {
@@ -72,13 +118,19 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             continue;
                         }
 
+                        // Track this PR as open
+                        let track_key = format!("{}:{}", repo, pr.number);
+                        tracked_states.insert(track_key, "open".to_string());
+
                         info!("New/updated PR found: {}#{} - {}", repo, pr.number, pr.title);
-                        emit_activity(
+                        emit_activity_full(
                             &app,
                             "pr_found",
                             repo,
                             Some(pr.number),
                             &format!("Found PR #{}: {}", pr.number, pr.title),
+                            Some(&pr.html_url),
+                            None,
                         );
 
                         // Fetch the diff
@@ -148,12 +200,14 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                                 ) {
                                     error!("Failed to log activity: {}", e);
                                 }
-                                emit_activity(
+                                emit_activity_full(
                                     &app,
                                     "review_posted",
                                     repo,
                                     Some(pr.number),
                                     &format!("Review posted for PR #{}", pr.number),
+                                    Some(&pr.html_url),
+                                    None,
                                 );
                             }
                             Err(e) => {
@@ -194,12 +248,26 @@ fn emit_activity(
     pr_number: Option<i64>,
     message: &str,
 ) {
+    emit_activity_full(app, event_type, repo, pr_number, message, None, None);
+}
+
+fn emit_activity_full(
+    app: &AppHandle,
+    event_type: &str,
+    repo: &str,
+    pr_number: Option<i64>,
+    message: &str,
+    html_url: Option<&str>,
+    pr_state: Option<&str>,
+) {
     let payload = serde_json::json!({
         "event_type": event_type,
         "repo": repo,
         "pr_number": pr_number,
         "message": message,
         "timestamp": chrono::Utc::now().to_rfc3339(),
+        "html_url": html_url,
+        "pr_state": pr_state,
     });
     let _ = app.emit("activity", payload);
 }
