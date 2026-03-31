@@ -657,9 +657,20 @@ body {
 }
 
 /* Interval selector */
+.settings-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.settings-row .card {
+  margin-bottom: 0;
+}
+
 .interval-options {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .interval-option {

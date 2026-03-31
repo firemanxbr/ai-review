@@ -144,6 +144,21 @@ impl Database {
         .collect()
     }
 
+    pub fn get_db_info(&self) -> (String, u64) {
+        let path = Self::db_path();
+        let path_str = path.to_string_lossy().to_string();
+        let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        (path_str, size)
+    }
+
+    pub fn reset_data(&self) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch(
+            "DELETE FROM reviews; DELETE FROM activity_log;",
+        )?;
+        Ok(())
+    }
+
     pub fn set_config(&self, key: &str, value: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
