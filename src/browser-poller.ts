@@ -236,6 +236,7 @@ let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let onActivity: ActivityHandler | null = null;
 let lmStudioWarned = false;
 const failedPrs = new Set<string>();
+const inProgress = new Set<string>();
 
 function emit(
   eventType: string,
@@ -384,8 +385,8 @@ async function pollOnce(
         ensureTracked(repo, pr.number, pr.html_url);
 
         const dedupKey = `${repo}:${pr.number}:${pr.head.sha}`;
-        if (reviewed.has(dedupKey)) continue;
-        if (failedPrs.has(dedupKey)) continue;
+        if (reviewed.has(dedupKey) || failedPrs.has(dedupKey) || inProgress.has(dedupKey)) continue;
+        inProgress.add(dedupKey);
 
         emit(
           "pr_found",
@@ -400,6 +401,7 @@ async function pollOnce(
         try {
           diff = await fetchDiff(repo, pr.number, pat);
         } catch (e) {
+          inProgress.delete(dedupKey);
           failedPrs.add(dedupKey);
           emit(
             "error",
@@ -426,6 +428,7 @@ async function pollOnce(
         try {
           reviewResult = await reviewWithLmStudio(model, pr.title, diff);
         } catch (e) {
+          inProgress.delete(dedupKey);
           failedPrs.add(dedupKey);
           emit(
             "error",
@@ -444,6 +447,7 @@ async function pollOnce(
 
         try {
           await postReview(repo, pr.number, reviewBody, pat);
+          inProgress.delete(dedupKey);
           markReviewed(dedupKey);
           emit(
             "review_posted",
@@ -458,6 +462,7 @@ async function pollOnce(
             }
           );
         } catch (e) {
+          inProgress.delete(dedupKey);
           failedPrs.add(dedupKey);
           emit(
             "error",
@@ -535,6 +540,7 @@ export function startPolling(
   onActivity = activityHandler;
   lmStudioWarned = false;
   failedPrs.clear();
+  inProgress.clear();
 
   // Seed tracked PRs from existing activity so state changes are detected
   seedTrackedPrsFromActivity();
