@@ -146,6 +146,7 @@ export default function PrGroupRow({ group, showState }: Props) {
         <button
           className="btn-icon"
           title="Re-review PR"
+          aria-label="Re-review PR"
           onClick={handleReReview}
           disabled={reviewing}
         >

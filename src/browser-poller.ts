@@ -566,16 +566,13 @@ export async function reReviewPr(
   pat: string,
   model: string,
 ): Promise<string> {
-  // Clear from failed set so polling won't skip it
-  for (const key of failedPrs) {
-    if (key.startsWith(`${repo}:${prNumber}:`)) {
-      failedPrs.delete(key);
-    }
+  // Clear from failed and reviewed sets so polling won't skip it
+  const prefix = `${repo}:${prNumber}:`;
+  for (const key of [...failedPrs]) {
+    if (key.startsWith(prefix)) failedPrs.delete(key);
   }
-
-  // Also clear from reviewed set
   const reviewed = getReviewed();
-  const reviewedArr = [...reviewed].filter((k) => !k.startsWith(`${repo}:${prNumber}:`));
+  const reviewedArr = [...reviewed].filter((k) => !k.startsWith(prefix));
   try {
     localStorage.setItem(REVIEWED_KEY, JSON.stringify(reviewedArr));
   } catch { /* ignore */ }

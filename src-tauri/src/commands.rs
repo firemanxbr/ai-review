@@ -182,10 +182,7 @@ pub async fn re_review_pr(
     let github = GitHubClient::new(&pat);
     let lmstudio = LmStudioClient::new(None);
 
-    // Clear previous review from DB so it's not skipped
-    let _ = state.db.delete_review(&repo, pr_number);
-
-    // Get PR info
+    // Get PR info first — don't touch DB until we know the PR is valid
     let pr = github.get_pr(&repo, pr_number).await?;
 
     emit_activity_event(&app, "reviewing", &repo, Some(pr_number),
@@ -205,12 +202,13 @@ pub async fn re_review_pr(
     );
     github.post_review_comment(&repo, pr_number, &review_body).await?;
 
-    // Record in DB
-    let _ = state.db.insert_review(&repo, pr_number, &pr.head.sha);
-    let _ = state.db.log_activity(
+    // Only clear and re-record in DB after successful review
+    state.db.delete_review(&repo, pr_number).map_err(|e| e.to_string())?;
+    state.db.insert_review(&repo, pr_number, &pr.head.sha).map_err(|e| e.to_string())?;
+    state.db.log_activity(
         "review_posted", &repo, Some(pr_number),
         &format!("Review posted for PR #{}", pr_number),
-    );
+    ).map_err(|e| e.to_string())?;
 
     emit_activity_event(&app, "review_posted", &repo, Some(pr_number),
         &format!("Review posted for PR #{}", pr_number),
