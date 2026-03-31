@@ -602,6 +602,16 @@ body {
 .model-item .model-name {
   font-family: "SF Mono", "Fira Code", monospace;
   font-size: 13px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 /* Scrollbar */

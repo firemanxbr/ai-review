@@ -161,6 +161,46 @@ pub async fn list_models() -> Result<Vec<String>, String> {
     Ok(models.into_iter().map(|m| m.id).collect())
 }
 
+#[tauri::command]
+pub async fn list_models_detailed() -> Result<Vec<serde_json::Value>, String> {
+    let client = LmStudioClient::new(None);
+    let models = client.list_models_detailed().await?;
+    Ok(models
+        .into_iter()
+        .filter(|m| m.model_type != "embeddings")
+        .map(|m| {
+            serde_json::json!({
+                "id": m.id,
+                "state": m.state,
+                "quantization": m.quantization,
+                "max_context_length": m.max_context_length,
+                "type": m.model_type,
+            })
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn load_model(model_id: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || LmStudioClient::load_model(&model_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn unload_model(model_id: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || LmStudioClient::unload_model(&model_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn download_model(model_id: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || LmStudioClient::download_model(&model_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // --- Database commands ---
 
 #[derive(Debug, Serialize, Deserialize)]
