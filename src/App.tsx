@@ -15,6 +15,7 @@ interface AppConfig {
   poll_interval_secs: number;
   is_polling_active: boolean;
   lm_studio_url: string;
+  polling_on_startup: boolean;
 }
 
 interface Status {

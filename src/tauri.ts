@@ -170,6 +170,16 @@ const browserHandlers: Record<string, (args: Record<string, unknown>) => unknown
     return (data.data || []).map((m: { id: string }) => m.id);
   },
   get_activity: () => [],
+  get_db_info: () => ({ path: "browser-mode (localStorage)", size_bytes: 0 }),
+  reset_database: () => {
+    localStorage.removeItem("ai-review-activity");
+    localStorage.removeItem("ai-review-tracked-prs");
+    localStorage.removeItem("ai-review-reviewed");
+  },
+  set_polling_on_startup: (args) => {
+    const cfg = { ...browserConfig, polling_on_startup: args.enabled as boolean };
+    saveConfig(cfg);
+  },
   re_review_pr: async (args) => {
     const { reReviewPr } = await import("./browser-poller");
     return reReviewPr(

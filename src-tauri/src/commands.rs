@@ -161,6 +161,37 @@ pub async fn list_models() -> Result<Vec<String>, String> {
     Ok(models.into_iter().map(|m| m.id).collect())
 }
 
+// --- Database commands ---
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DbInfo {
+    pub path: String,
+    pub size_bytes: u64,
+}
+
+#[tauri::command]
+pub fn get_db_info(state: State<'_, Arc<AppState>>) -> DbInfo {
+    let (path, size_bytes) = state.db.get_db_info();
+    DbInfo { path, size_bytes }
+}
+
+#[tauri::command]
+pub fn reset_database(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    state.db.reset_data().map_err(|e| e.to_string())
+}
+
+// --- Startup commands ---
+
+#[tauri::command]
+pub fn set_polling_on_startup(state: State<'_, Arc<AppState>>, enabled: bool) -> Result<(), String> {
+    {
+        let mut config = state.config.lock().unwrap();
+        config.polling_on_startup = enabled;
+    }
+    state.save_config();
+    Ok(())
+}
+
 // --- Review commands ---
 
 #[tauri::command]

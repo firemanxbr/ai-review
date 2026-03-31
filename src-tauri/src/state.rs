@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub poll_interval_secs: u64,
     pub is_polling_active: bool,
     pub lm_studio_url: String,
+    pub polling_on_startup: bool,
 }
 
 impl Default for AppConfig {
@@ -21,6 +22,7 @@ impl Default for AppConfig {
             poll_interval_secs: 10,
             is_polling_active: false,
             lm_studio_url: "http://localhost:1234".to_string(),
+            polling_on_startup: false,
         }
     }
 }
@@ -55,6 +57,12 @@ impl AppState {
         if let Some(url) = db.get_config("lm_studio_url") {
             config.lm_studio_url = url;
         }
+        if let Some(v) = db.get_config("polling_on_startup") {
+            config.polling_on_startup = v == "true";
+        }
+        if config.polling_on_startup {
+            config.is_polling_active = true;
+        }
 
         Self {
             config: Mutex::new(config),
@@ -77,5 +85,9 @@ impl AppState {
         let _ = self
             .db
             .set_config("lm_studio_url", &config.lm_studio_url);
+        let _ = self.db.set_config(
+            "polling_on_startup",
+            if config.polling_on_startup { "true" } else { "false" },
+        );
     }
 }
