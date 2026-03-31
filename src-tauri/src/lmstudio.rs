@@ -117,7 +117,15 @@ impl LmStudioClient {
         Ok(list.data)
     }
 
+    fn validate_model_id(model_id: &str) -> Result<(), String> {
+        if model_id.is_empty() || model_id.starts_with('-') || model_id.contains("..") {
+            return Err("Invalid model identifier".to_string());
+        }
+        Ok(())
+    }
+
     pub fn load_model(model_id: &str) -> Result<String, String> {
+        Self::validate_model_id(model_id)?;
         let output = std::process::Command::new("lms")
             .args(["load", model_id, "-y"])
             .output()
@@ -130,6 +138,7 @@ impl LmStudioClient {
     }
 
     pub fn unload_model(model_id: &str) -> Result<String, String> {
+        Self::validate_model_id(model_id)?;
         let output = std::process::Command::new("lms")
             .args(["unload", model_id])
             .output()
@@ -142,6 +151,7 @@ impl LmStudioClient {
     }
 
     pub fn download_model(model_id: &str) -> Result<String, String> {
+        Self::validate_model_id(model_id)?;
         let output = std::process::Command::new("lms")
             .args(["get", model_id, "-y"])
             .output()
