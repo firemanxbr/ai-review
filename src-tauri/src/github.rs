@@ -19,6 +19,7 @@ pub struct PullRequest {
     pub user: GitHubUser,
     pub created_at: String,
     pub updated_at: String,
+    pub merged_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -99,6 +100,25 @@ impl GitHubClient {
             ));
         }
         resp.json::<Vec<PullRequest>>()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn get_pr(&self, repo: &str, pr_number: i64) -> Result<PullRequest, String> {
+        let mut req = self
+            .client
+            .get(format!("{}/repos/{}/pulls/{}", GITHUB_API, repo, pr_number));
+        for (key, value) in self.auth_headers() {
+            req = req.header(key, value);
+        }
+        let resp = req.send().await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!(
+                "Failed to fetch PR {}#{}: HTTP {}",
+                repo, pr_number, resp.status()
+            ));
+        }
+        resp.json::<PullRequest>()
             .await
             .map_err(|e| e.to_string())
     }

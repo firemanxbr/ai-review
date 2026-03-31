@@ -122,6 +122,19 @@ impl Database {
         Ok(entries)
     }
 
+    pub fn get_reviewed_prs(&self) -> Vec<(String, i64)> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT DISTINCT repo, pr_number FROM reviews")
+            .unwrap();
+        stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect()
+    }
+
     pub fn set_config(&self, key: &str, value: &str) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
