@@ -47,6 +47,7 @@ pub fn run() {
             commands::check_lmstudio,
             commands::list_models,
             commands::get_activity,
+            commands::re_review_pr,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

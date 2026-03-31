@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActivityItem } from "../App";
-import { openUrl } from "../tauri";
+import { invoke, openUrl } from "../tauri";
 
 export function eventIcon(eventType: string): string {
   switch (eventType) {
@@ -90,7 +90,21 @@ interface Props {
 
 export default function PrGroupRow({ group, showState }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const latest = group.events[0];
+
+  const handleReReview = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (reviewing) return;
+    setReviewing(true);
+    try {
+      await invoke("re_review_pr", { repo: group.repo, prNumber: group.prNumber });
+    } catch (err) {
+      console.error("Re-review failed:", err);
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   return (
     <div className="pr-group">
@@ -129,6 +143,15 @@ export default function PrGroupRow({ group, showState }: Props) {
           </span>
         )}
         <span className="repo-tag">{group.repo}</span>
+        <button
+          className="btn-icon"
+          title="Re-review PR"
+          aria-label="Re-review PR"
+          onClick={handleReReview}
+          disabled={reviewing}
+        >
+          {reviewing ? "\u23F3" : "\u21BB"}
+        </button>
         <span className="timestamp">
           {new Date(latest.timestamp).toLocaleTimeString()}
         </span>

@@ -12,6 +12,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
 
     let mut lm_studio_warned = false;
     let mut failed_prs: HashSet<String> = HashSet::new();
+    let mut in_progress: HashSet<String> = HashSet::new();
     // Track PR states: key = "repo:pr_number", value = "open" | "closed" | "merged"
     let mut tracked_states: HashMap<String, String> = HashMap::new();
 
@@ -114,9 +115,11 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                         let dedup_key = format!("{}:{}:{}", repo, pr.number, pr.head.sha);
                         let already_reviewed =
                             state.db.has_review(repo, pr.number, &pr.head.sha);
-                        if already_reviewed || failed_prs.contains(&dedup_key) {
+                        if already_reviewed || failed_prs.contains(&dedup_key) || in_progress.contains(&dedup_key) {
                             continue;
                         }
+
+                        in_progress.insert(dedup_key.clone());
 
                         // Track this PR as open
                         let track_key = format!("{}:{}", repo, pr.number);
@@ -138,6 +141,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             Ok(d) => d,
                             Err(e) => {
                                 error!("Failed to get diff for {}#{}: {}", repo, pr.number, e);
+                                in_progress.remove(&dedup_key);
                                 failed_prs.insert(dedup_key.clone());
                                 emit_activity(
                                     &app,
@@ -163,6 +167,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             Ok(r) => r,
                             Err(e) => {
                                 error!("LM Studio review failed for {}#{}: {}", repo, pr.number, e);
+                                in_progress.remove(&dedup_key);
                                 failed_prs.insert(dedup_key.clone());
                                 emit_activity(
                                     &app,
@@ -187,6 +192,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                         {
                             Ok(_) => {
                                 info!("Review posted for {}#{}", repo, pr.number);
+                                in_progress.remove(&dedup_key);
                                 if let Err(e) =
                                     state.db.insert_review(repo, pr.number, &pr.head.sha)
                                 {
@@ -212,6 +218,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             }
                             Err(e) => {
                                 error!("Failed to post review for {}#{}: {}", repo, pr.number, e);
+                                in_progress.remove(&dedup_key);
                                 failed_prs.insert(dedup_key.clone());
                                 emit_activity(
                                     &app,

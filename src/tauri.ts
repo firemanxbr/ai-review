@@ -170,6 +170,15 @@ const browserHandlers: Record<string, (args: Record<string, unknown>) => unknown
     return (data.data || []).map((m: { id: string }) => m.id);
   },
   get_activity: () => [],
+  re_review_pr: async (args) => {
+    const { reReviewPr } = await import("./browser-poller");
+    return reReviewPr(
+      args.repo as string,
+      args.pr_number as number,
+      browserConfig.github_pat,
+      browserConfig.selected_model,
+    );
+  },
 };
 
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {

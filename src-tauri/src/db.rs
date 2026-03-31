@@ -86,6 +86,15 @@ impl Database {
         Ok(())
     }
 
+    pub fn delete_review(&self, repo: &str, pr_number: i64) -> SqliteResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM reviews WHERE repo = ? AND pr_number = ?",
+            rusqlite::params![repo, pr_number],
+        )?;
+        Ok(())
+    }
+
     pub fn log_activity(
         &self,
         event_type: &str,
