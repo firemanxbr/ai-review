@@ -161,6 +161,85 @@ pub async fn list_models() -> Result<Vec<String>, String> {
     Ok(models.into_iter().map(|m| m.id).collect())
 }
 
+// --- Review commands ---
+
+#[tauri::command]
+pub async fn re_review_pr(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppState>>,
+    repo: String,
+    pr_number: i64,
+) -> Result<String, String> {
+    let (pat, model) = {
+        let config = state.config.lock().unwrap();
+        (config.github_pat.clone(), config.selected_model.clone())
+    };
+
+    if pat.is_empty() || model.is_empty() {
+        return Err("GitHub PAT and model must be configured".to_string());
+    }
+
+    let github = GitHubClient::new(&pat);
+    let lmstudio = LmStudioClient::new(None);
+
+    // Clear previous review from DB so it's not skipped
+    let _ = state.db.delete_review(&repo, pr_number);
+
+    // Get PR info
+    let pr = github.get_pr(&repo, pr_number).await?;
+
+    emit_activity_event(&app, "reviewing", &repo, Some(pr_number),
+        &format!("Re-reviewing PR #{} with model {}...", pr_number, model),
+        Some(&pr.html_url), None);
+
+    // Fetch diff
+    let diff = github.get_pr_diff(&repo, pr_number).await?;
+
+    // Review with LM Studio
+    let review = lmstudio.review_diff(&model, &pr.title, &diff).await?;
+
+    // Post review to GitHub
+    let review_body = format!(
+        "## 🤖 AI Review (Local — powered by LM Studio)\n\n{}\n\n---\n*Reviewed by [AI Review](https://github.com/firemanxbr/ai-review) using model `{}`*",
+        review, model
+    );
+    github.post_review_comment(&repo, pr_number, &review_body).await?;
+
+    // Record in DB
+    let _ = state.db.insert_review(&repo, pr_number, &pr.head.sha);
+    let _ = state.db.log_activity(
+        "review_posted", &repo, Some(pr_number),
+        &format!("Review posted for PR #{}", pr_number),
+    );
+
+    emit_activity_event(&app, "review_posted", &repo, Some(pr_number),
+        &format!("Review posted for PR #{}", pr_number),
+        Some(&pr.html_url), None);
+
+    Ok("Review posted".to_string())
+}
+
+fn emit_activity_event(
+    app: &tauri::AppHandle,
+    event_type: &str,
+    repo: &str,
+    pr_number: Option<i64>,
+    message: &str,
+    html_url: Option<&str>,
+    pr_state: Option<&str>,
+) {
+    let payload = serde_json::json!({
+        "event_type": event_type,
+        "repo": repo,
+        "pr_number": pr_number,
+        "message": message,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "html_url": html_url,
+        "pr_state": pr_state,
+    });
+    let _ = tauri::Emitter::emit(app, "activity", payload);
+}
+
 // --- Activity commands ---
 
 #[tauri::command]

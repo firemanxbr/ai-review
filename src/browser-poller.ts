@@ -560,6 +560,61 @@ export function isPollingRunning(): boolean {
   return pollingTimer !== null;
 }
 
+export async function reReviewPr(
+  repo: string,
+  prNumber: number,
+  pat: string,
+  model: string,
+): Promise<string> {
+  // Clear from failed set so polling won't skip it
+  for (const key of failedPrs) {
+    if (key.startsWith(`${repo}:${prNumber}:`)) {
+      failedPrs.delete(key);
+    }
+  }
+
+  // Also clear from reviewed set
+  const reviewed = getReviewed();
+  const reviewedArr = [...reviewed].filter((k) => !k.startsWith(`${repo}:${prNumber}:`));
+  try {
+    localStorage.setItem(REVIEWED_KEY, JSON.stringify(reviewedArr));
+  } catch { /* ignore */ }
+
+  // Fetch PR info
+  const resp = await fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
+    headers: {
+      Authorization: `Bearer ${pat}`,
+      Accept: "application/vnd.github.v3+json",
+      "User-Agent": "AI-Review/0.1.0",
+    },
+  });
+  if (!resp.ok) throw new Error(`Failed to fetch PR: HTTP ${resp.status}`);
+  const pr = await resp.json();
+
+  emit("reviewing", repo, prNumber,
+    `Re-reviewing PR #${prNumber} with model ${model}...`, pr.html_url);
+
+  const diff = await fetchDiff(repo, prNumber, pat);
+  const { content, tokens_used } = await reviewWithLmStudio(model, pr.title, diff);
+  const severity = parseReviewSeverity(content);
+  const reviewBody = `## 🤖 AI Review (Local — powered by LM Studio)\n\n${content}\n\n---\n*Reviewed by [AI Review](https://github.com/firemanxbr/ai-review) using model \`${model}\`*`;
+
+  await postReview(repo, prNumber, reviewBody, pat);
+
+  // Mark as reviewed
+  const dedupKey = `${repo}:${prNumber}:${pr.head.sha}`;
+  markReviewed(dedupKey);
+
+  emit("review_posted", repo, prNumber,
+    `Review posted for PR #${prNumber}`, pr.html_url, {
+      tokens_used,
+      review_summary: severity,
+      diff_size: diff.length,
+    });
+
+  return "Review posted";
+}
+
 export async function fetchClosedPRs(
   repo: string,
   pat: string
