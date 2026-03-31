@@ -76,6 +76,10 @@ export function groupByPr(items: ActivityItem[]): PrGroup[] {
       group.prState = item.pr_state;
     }
   }
+  // Sort events newest-first so events[0] is always the latest
+  for (const group of groups.values()) {
+    group.events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
   return [...groups.values()];
 }
 
