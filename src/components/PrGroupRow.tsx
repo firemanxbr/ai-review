@@ -26,14 +26,9 @@ export function eventIcon(eventType: string): string {
 }
 
 function summaryIcon(events: ActivityItem[]): string {
-  const types = events.map((e) => e.event_type);
-  if (types.includes("pr_merged")) return "\uD83D\uDFE3";
-  if (types.includes("pr_closed")) return "\uD83D\uDD34";
-  if (types.includes("error")) return "\u274C";
-  if (types.includes("review_posted")) return "\u2705";
-  if (types.includes("reviewing")) return "\uD83E\uDD16";
-  if (types.includes("pr_reopened")) return "\uD83D\uDD04";
-  return "\uD83D\uDD0D";
+  const latest = events[0];
+  if (!latest) return "\uD83D\uDD0D";
+  return eventIcon(latest.event_type);
 }
 
 function summaryStatus(events: ActivityItem[]): string {
@@ -80,6 +75,10 @@ export function groupByPr(items: ActivityItem[]): PrGroup[] {
     if (item.pr_state && !group.prState) {
       group.prState = item.pr_state;
     }
+  }
+  // Sort events newest-first so events[0] is always the latest
+  for (const group of groups.values()) {
+    group.events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
   return [...groups.values()];
 }

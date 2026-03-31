@@ -20,9 +20,12 @@ function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: s
   const [expanded, setExpanded] = useState(false);
   const latest = group.events[0];
 
-  const types = group.events.map((e) => e.event_type);
-  const icon = types.includes("error") ? "\u274C" : types.includes("review_posted") ? "\u2705" : types.includes("reviewing") ? "\uD83E\uDD16" : "\uD83D\uDD0D";
-  const statusText = types.includes("error") ? "Error" : types.includes("review_posted") ? "Review posted" : types.includes("reviewing") ? "Reviewing..." : "Found";
+  const icon = eventIcon(latest.event_type);
+  const statusMap: Record<string, string> = {
+    error: "Error", review_posted: "Review posted", reviewing: "Reviewing...",
+    pr_merged: "Merged", pr_closed: "Closed", pr_reopened: "Reopened",
+  };
+  const statusText = statusMap[latest.event_type] || "Found";
   const prUrl = `https://github.com/${group.repo}/pull/${group.prNumber}`;
 
   return (

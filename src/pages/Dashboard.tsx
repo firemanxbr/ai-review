@@ -95,17 +95,9 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
             </span>
           )}
         </div>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h2>Polling Control</h2>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span
-              className={`badge ${config?.is_polling_active ? "badge-success" : "badge-warning"}`}
-            >
-              {config?.is_polling_active ? "Active" : "Paused"}
-            </span>
+        <div className="status-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="label">Polling</span>
             <label className="toggle">
               <input
                 type="checkbox"
@@ -115,12 +107,17 @@ function Dashboard({ config, status, activity, onRefresh, onConfigChange }: Prop
               <span className="toggle-slider" />
             </label>
           </div>
+          <span className="value" style={{ fontSize: "14px" }}>
+            {config?.is_polling_active
+              ? `Every ${config.poll_interval_secs}s`
+              : "Paused"}
+          </span>
+          {config?.is_polling_active && config.selected_model && (
+            <span className="label" style={{ marginTop: "2px" }}>
+              {config.selected_model}
+            </span>
+          )}
         </div>
-        <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-          {config?.is_polling_active
-            ? `Checking ${config.watched_repos.length} repo(s) every ${config.poll_interval_secs}s using model "${config.selected_model || "none selected"}"`
-            : "Enable polling to start monitoring PRs for code review"}
-        </p>
       </div>
 
       <div className="card">
