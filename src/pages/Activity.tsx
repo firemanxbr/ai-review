@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { invoke } from "../tauri";
+import { invoke, openUrl } from "../tauri";
 import type { ActivityItem } from "../App";
 import PrGroupRow, { groupByPr, eventIcon } from "../components/PrGroupRow";
 
@@ -20,19 +20,6 @@ function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: s
   const [expanded, setExpanded] = useState(false);
   const latest = group.events[0];
 
-  if (group.prNumber === 0) {
-    return (
-      <div className="activity-item">
-        <span className="event-icon">{eventIcon(latest.event_type)}</span>
-        <span className="message">{latest.message}</span>
-        {latest.repo && <span className="repo-tag">{latest.repo}</span>}
-        <span className="timestamp">
-          {new Date(latest.created_at).toLocaleString()}
-        </span>
-      </div>
-    );
-  }
-
   const types = group.events.map((e) => e.event_type);
   const icon = types.includes("error") ? "\u274C" : types.includes("review_posted") ? "\u2705" : types.includes("reviewing") ? "\uD83E\uDD16" : "\uD83D\uDD0D";
   const statusText = types.includes("error") ? "Error" : types.includes("review_posted") ? "Review posted" : types.includes("reviewing") ? "Reviewing..." : "Found";
@@ -43,7 +30,15 @@ function DbGroupRow({ group }: { group: { key: string; prNumber: number; repo: s
       <div className="pr-group-summary" onClick={() => setExpanded(!expanded)}>
         <span className="event-icon">{icon}</span>
         <span className="message">
-          <a href={prUrl} target="_blank" rel="noopener noreferrer" className="pr-link" onClick={(e) => e.stopPropagation()}>
+          <a
+            className="pr-link"
+            href={prUrl}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              openUrl(prUrl);
+            }}
+          >
             PR #{group.prNumber}
           </a>
           {" — "}{statusText}
@@ -82,7 +77,8 @@ function groupDbByPr(items: DbActivity[]): { key: string; prNumber: number; repo
   const groups = new Map<string, { key: string; prNumber: number; repo: string; prState?: "closed" | "merged" | "reopened"; events: DbActivity[] }>();
   for (const item of items) {
     const pr = item.pr_number ?? 0;
-    const key = pr ? `${item.repo}:${pr}` : `standalone-${item.id}`;
+    if (!pr) continue;
+    const key = `${item.repo}:${pr}`;
     if (!groups.has(key)) {
       groups.set(key, { key, prNumber: pr, repo: item.repo, events: [] });
     }
@@ -130,7 +126,7 @@ function Activity({ liveActivity }: Props) {
           <div className="card-header">
             <h2>Live Session</h2>
             <span className="badge badge-success">
-              {activeLiveGroups.length} PR(s)
+              {activeLiveGroups.length}
             </span>
           </div>
           <div className="activity-feed">

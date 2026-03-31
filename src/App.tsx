@@ -308,7 +308,7 @@ function App() {
             <span
               className={`status-dot ${status.polling_active ? "online" : "warning"}`}
             />
-            {status.polling_active ? "Polling active" : "Polling paused"}
+            Polling
           </div>
         </div>
       </nav>
