@@ -17,6 +17,24 @@ pub struct LmModelList {
     pub data: Vec<LmModel>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LmModelDetail {
+    pub id: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub quantization: String,
+    #[serde(default)]
+    pub max_context_length: u64,
+    #[serde(rename = "type", default)]
+    pub model_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LmModelDetailList {
+    pub data: Vec<LmModelDetail>,
+}
+
 #[derive(Debug, Serialize)]
 struct ChatMessage {
     role: String,
@@ -83,6 +101,56 @@ impl LmStudioClient {
         }
         let list: LmModelList = resp.json().await.map_err(|e| e.to_string())?;
         Ok(list.data)
+    }
+
+    pub async fn list_models_detailed(&self) -> Result<Vec<LmModelDetail>, String> {
+        let resp = self
+            .client
+            .get(format!("{}/api/v0/models", self.base_url))
+            .send()
+            .await
+            .map_err(|e| format!("LM Studio not reachable: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!("LM Studio returned HTTP {}", resp.status()));
+        }
+        let list: LmModelDetailList = resp.json().await.map_err(|e| e.to_string())?;
+        Ok(list.data)
+    }
+
+    pub fn load_model(model_id: &str) -> Result<String, String> {
+        let output = std::process::Command::new("lms")
+            .args(["load", model_id, "-y"])
+            .output()
+            .map_err(|e| format!("Failed to run lms: {}", e))?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+
+    pub fn unload_model(model_id: &str) -> Result<String, String> {
+        let output = std::process::Command::new("lms")
+            .args(["unload", model_id])
+            .output()
+            .map_err(|e| format!("Failed to run lms: {}", e))?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+
+    pub fn download_model(model_id: &str) -> Result<String, String> {
+        let output = std::process::Command::new("lms")
+            .args(["get", model_id, "-y"])
+            .output()
+            .map_err(|e| format!("Failed to run lms: {}", e))?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
     }
 
     pub async fn review_diff(

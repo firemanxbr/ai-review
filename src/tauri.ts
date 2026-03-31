@@ -169,6 +169,20 @@ const browserHandlers: Record<string, (args: Record<string, unknown>) => unknown
     const data = await resp.json();
     return (data.data || []).map((m: { id: string }) => m.id);
   },
+  list_models_detailed: async () => {
+    const resp = await fetch("/lmstudio/api/v0/models");
+    const data = await resp.json();
+    return (data.data || []).filter((m: { type: string }) => m.type !== "embeddings");
+  },
+  load_model: async (args) => {
+    return `Model ${args.model_id} load requested (use LM Studio UI in browser mode)`;
+  },
+  unload_model: async (args) => {
+    return `Model ${args.model_id} unload requested (use LM Studio UI in browser mode)`;
+  },
+  download_model: async (args) => {
+    return `Model ${args.model_id} download requested (use LM Studio UI in browser mode)`;
+  },
   get_activity: () => [],
   get_db_info: () => ({ path: "browser-mode (localStorage)", size_bytes: 0 }),
   reset_database: () => {
