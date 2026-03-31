@@ -151,10 +151,14 @@ Keep the review concise and actionable. Focus on the most impactful findings."#;
         }
 
         let completion: ChatCompletionResponse = resp.json().await.map_err(|e| e.to_string())?;
-        completion
+        let content = completion
             .choices
             .first()
-            .map(|c| c.message.content.clone())
-            .ok_or_else(|| "No response from model".to_string())
+            .map(|c| c.message.content.trim().to_string())
+            .unwrap_or_default();
+        if content.is_empty() {
+            return Err("Model returned empty response".to_string());
+        }
+        Ok(content)
     }
 }

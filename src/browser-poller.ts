@@ -199,7 +199,10 @@ Keep the review concise and actionable. Focus on the most impactful findings.`,
     throw new Error(`LM Studio HTTP ${resp.status}: ${text}`);
   }
   const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || "No response from model";
+  const content = (data.choices?.[0]?.message?.content || "").trim();
+  if (!content) {
+    throw new Error("Model returned empty response");
+  }
   const tokens_used = data.usage?.total_tokens ?? 0;
   return { content, tokens_used };
 }
