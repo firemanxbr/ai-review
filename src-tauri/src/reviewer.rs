@@ -2,12 +2,16 @@ use crate::github::GitHubClient;
 use crate::lmstudio::LmStudioClient;
 use crate::state::AppState;
 use log::{error, info};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::time::{sleep, Duration};
 
 pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
     info!("PR polling loop started");
+
+    let mut lm_studio_warned = false;
+    let mut failed_prs: HashSet<String> = HashSet::new();
 
     loop {
         let interval = {
@@ -44,9 +48,14 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
 
         // Check LM Studio health
         match lmstudio.health_check().await {
-            Ok(true) => {}
+            Ok(true) => {
+                lm_studio_warned = false;
+            }
             _ => {
-                emit_activity(&app, "warning", "", None, "LM Studio is not running");
+                if !lm_studio_warned {
+                    emit_activity(&app, "warning", "", None, "LM Studio is not running");
+                    lm_studio_warned = true;
+                }
                 sleep(Duration::from_secs(interval)).await;
                 continue;
             }
@@ -56,9 +65,10 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
             match github.get_open_prs(repo).await {
                 Ok(prs) => {
                     for pr in prs {
+                        let dedup_key = format!("{}:{}:{}", repo, pr.number, pr.head.sha);
                         let already_reviewed =
                             state.db.has_review(repo, pr.number, &pr.head.sha);
-                        if already_reviewed {
+                        if already_reviewed || failed_prs.contains(&dedup_key) {
                             continue;
                         }
 
@@ -76,6 +86,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             Ok(d) => d,
                             Err(e) => {
                                 error!("Failed to get diff for {}#{}: {}", repo, pr.number, e);
+                                failed_prs.insert(dedup_key.clone());
                                 emit_activity(
                                     &app,
                                     "error",
@@ -100,6 +111,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             Ok(r) => r,
                             Err(e) => {
                                 error!("LM Studio review failed for {}#{}: {}", repo, pr.number, e);
+                                failed_prs.insert(dedup_key.clone());
                                 emit_activity(
                                     &app,
                                     "error",
@@ -146,6 +158,7 @@ pub async fn start_polling_loop(app: AppHandle, state: Arc<AppState>) {
                             }
                             Err(e) => {
                                 error!("Failed to post review for {}#{}: {}", repo, pr.number, e);
+                                failed_prs.insert(dedup_key.clone());
                                 emit_activity(
                                     &app,
                                     "error",
