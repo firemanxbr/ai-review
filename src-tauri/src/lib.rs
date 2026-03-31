@@ -48,6 +48,9 @@ pub fn run() {
             commands::list_models,
             commands::get_activity,
             commands::re_review_pr,
+            commands::get_db_info,
+            commands::reset_database,
+            commands::set_polling_on_startup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
